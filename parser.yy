@@ -184,18 +184,23 @@ non_return_statement_list: non_return_statement_list statement
         $$ = new Node("StatementList", "", yylineno);
     };
 
-param_list: type ID { 
-        $$ = new Node("ParameterList", "", yylineno);
-        $$->children.push_back(new Node("Type", $1->value, yylineno));
-        $$->children.push_back(new Node("Identifier", $2, yylineno));
-    }
-    | param_list COMMA type ID { 
-        $$ = $1;
-        $$->children.push_back(new Node("Type", $3->value, yylineno));
-        $$->children.push_back(new Node("Identifier", $4, yylineno));
-    }
-    | /* empty */ { $$ = new Node("ParameterList", "", yylineno); };
-
+param_list:
+      type ID {
+          Node* param = new Node("Parameter", "", yylineno);
+          param->children.push_back($1);
+          param->children.push_back(new Node("Identifier", $2, yylineno));
+          $$ = new Node("ParameterList", "", yylineno);
+          $$->children.push_back(param);
+      }
+    | param_list COMMA type ID {
+          Node* param = new Node("Parameter", "", yylineno);
+          param->children.push_back($3);
+          param->children.push_back(new Node("Identifier", $4, yylineno));
+          $$ = $1;
+          $$->children.push_back(param);
+      }
+    | /* empty */ { $$ = new Node("ParameterList", "", yylineno); }
+;
 
 statement_list: statement_list statement     { $$ = $1; $$->children.push_back($2); }
     | /* empty */                           { $$ = new Node("StatementList", "", yylineno); }

@@ -83,21 +83,12 @@ void SymbolTable::processNode(Node* node) {
     }
     else if (node->type == "MethodDeclaration" && !node->children.empty()) {
         auto it = node->children.begin();
+        if ((*it)->type == "Public") ++it;
         
-        // Skip access modifier if present
-        if ((*it)->type == "Public") {
-            ++it;
-        }
-        
-        // Get return type and method name
         std::string returnType = (*it)->value;
         ++it;
-        std::string methodName = (*it)->value;
         
-        // Skip if duplicate (error reported by SemanticAnalyzer)
-        if (isDuplicateMethod(currentClass, methodName)) {
-            return;
-        }
+        std::string methodName = (*it)->value;
         
         // Add method to symbol table
         addMethod(methodName, returnType);
@@ -106,16 +97,13 @@ void SymbolTable::processNode(Node* node) {
         // Process method parameters
         ++it;
         if (it != node->children.end() && (*it)->type == "ParameterList") {
+            std::map<std::string, bool> seenParams;
             for (auto paramNode : (*it)->children) {
                 if (paramNode->type == "Parameter") {
                     std::string paramType = paramNode->children.front()->value;
                     std::string paramName = paramNode->children.back()->value;
-                    
-                    // Skip if duplicate (error reported by SemanticAnalyzer)
-                    if (isDuplicateParam(currentClass, methodName, paramName)) {
-                        continue;
-                    }
-                    
+
+                    seenParams[paramName] = true;
                     // Add parameter to symbol table
                     addVariable(paramName, paramType, true);
                 }
@@ -124,35 +112,20 @@ void SymbolTable::processNode(Node* node) {
         
         // Process method body
         for (auto child : node->children) {
-            if (child->type == "Block") {
-                for (auto stmt : child->children) {
-                    processNode(stmt);
-                }
-            }
+            processNode(child);
         }
+        
+        // DEBUG: Print MethodDeclaration children types
+        std::cout << "DEBUG: MethodDeclaration children: ";
+        for (auto child : node->children) {
+            std::cout << child->type << " ";
+        }
+        std::cout << std::endl;
         
         currentMethod = "";
     }
-    else if (node->type == "VarDeclaration" && node->children.size() >= 2) {
-        std::string varType = node->children.front()->value;
-        std::string varName = node->children.back()->value;
-        
-        // Skip if duplicate (error reported by SemanticAnalyzer)
-        if (!currentMethod.empty()) {
-            if (isDuplicateLocal(currentClass, currentMethod, varName)) {
-                return;
-            }
-        } else if (!currentClass.empty()) {
-            if (isDuplicateField(currentClass, varName)) {
-                return;
-            }
-        }
-        
-        // Add variable to symbol table
-        addVariable(varName, varType);
-    }
     else {
-        // Process other node types recursively
+        // Process other nodes
         for (auto child : node->children) {
             processNode(child);
         }

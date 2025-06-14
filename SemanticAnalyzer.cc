@@ -128,17 +128,24 @@ void SemanticAnalyzer::checkMethodDeclaration(Node* node) {
     // Check parameters for duplicates within this method
     ++it; // Move to parameter list
     if (it != node->children.end() && (*it)->type == "ParameterList") {
-        std::map<std::string, int> methodParams;
+        std::cout << "DEBUG: Parameters for method " << methodName << ": ";
+        for (auto paramNode : (*it)->children) {
+            if (paramNode->type == "Parameter" && paramNode->children.size() >= 2) {
+                std::cout << paramNode->children.back()->value << " ";
+            }
+        }
+        std::cout << std::endl;
+        std::map<std::string, int> paramNames;
         
         for (auto paramNode : (*it)->children) {
             if (paramNode->type == "Parameter" && paramNode->children.size() >= 2) {
                 std::string paramName = paramNode->children.back()->value;
                 
-                if (methodParams.count(paramName) > 0) {  // CHANGED: Use count() for clarity
+                if (paramNames.find(paramName) != paramNames.end()) {
                     // Duplicate parameter in the same method
                     addError("Already Declared parameter: '" + paramName + "'", paramNode->lineno);
                 } else {
-                    methodParams[paramName] = paramNode->lineno;
+                    paramNames[paramName] = paramNode->lineno;
                     
                     // Add to global param tracking
                     std::string paramKey = key + "." + paramName;
@@ -154,16 +161,16 @@ void SemanticAnalyzer::checkLocalVarDeclaration(Node* node) {
     
     std::string varName = node->children.back()->value;
     std::string methodKey = currentClass + "." + currentMethod;
-    std::string localKey = methodKey + "." + varName;
     std::string paramKey = methodKey + "." + varName;
     
     // Check if it conflicts with a parameter
-    if (paramLines.count(paramKey) > 0) {  // CHANGED: Use count() for clarity
+    if (paramLines.find(paramKey) != paramLines.end()) {
         addError("Already Declared parameter: '" + varName + "'", node->lineno);
-        return;
+        return; // Return early to avoid adding it to localLines
     }
     
     // Check if it's a duplicate local
+    std::string localKey = methodKey + "." + varName;
     if (localLines.find(localKey) != localLines.end()) {
         addError("Already Declared variable: '" + varName + "'", node->lineno);
     } else {
@@ -250,18 +257,27 @@ std::string SemanticAnalyzer::getExpressionType(Node* node) {
                 if (methodIt != classRecord->methods.end()) {
                     auto methodRecord = std::dynamic_pointer_cast<MethodRecord>(methodIt->second);
                     if (methodRecord) {
-                        // Enhanced parameter checking
+                        // Check parameters first with clearer logging
                         auto paramIt = methodRecord->params.find(identifierName);
                         if (paramIt != methodRecord->params.end()) {
                             auto varRecord = std::dynamic_pointer_cast<VarRecord>(paramIt->second);
                             if (varRecord) {
+                                // It's a parameter, always valid
                                 return varRecord->type;
                             }
                         }
                         
-                        // Then check local variables
+                        // Then check local variables - ensure they're declared before use
                         auto localIt = methodRecord->locals.find(identifierName);
                         if (localIt != methodRecord->locals.end()) {
+                            // Check if the variable is used before declaration
+                            std::string localKey = currentClass + "." + currentMethod + "." + identifierName;
+                            if (localLines.find(localKey) != localLines.end() && 
+                                node->lineno < localLines[localKey]) {
+                                addError("'" + identifierName + "' is not defined yet", node->lineno);
+                                return "";
+                            }
+                            
                             auto varRecord = std::dynamic_pointer_cast<VarRecord>(localIt->second);
                             if (varRecord) {
                                 return varRecord->type;
@@ -309,7 +325,7 @@ void SemanticAnalyzer::checkMethodCall(Node* node) {
     auto methodNameNode = *(++node->children.begin());
     
     std::string objType = getExpressionType(objExpr);
-    if (objType.empty()) return; // Error already reported
+    if (objType.empty()) return; // Error already reported 
     
     auto classRecord = symbolTable.getClass(objType);
     if (!classRecord) {
@@ -386,14 +402,44 @@ void SemanticAnalyzer::checkAssignment(Node* node) {
     auto leftNode = node->children.front();
     auto rightNode = *(++node->children.begin());
     
+    // First check if we're using a variable before it's declared
+    if (leftNode->type == "Identifier") {
+        std::string varName = leftNode->value;
+        std::string methodKey = currentClass + "." + currentMethod;
+        std::string localKey = methodKey + "." + varName;
+        
+        // Check if it's a parameter (parameters are always valid)
+        bool isParameter = false;
+        if (!currentClass.empty() && !currentMethod.empty()) {
+            auto classRecord = symbolTable.getClass(currentClass);
+            if (classRecord) {
+                auto methodIt = classRecord->methods.find(currentMethod);
+                if (methodIt != classRecord->methods.end()) {
+                    auto methodRecord = std::dynamic_pointer_cast<MethodRecord>(methodIt->second);
+                    if (methodRecord && methodRecord->params.find(varName) != methodRecord->params.end()) {
+                        isParameter = true;
+                    }
+                }
+            }
+        }
+        
+        // If it's not a parameter, check if it's a local variable used before declaration
+        if (!isParameter && localLines.find(localKey) != localLines.end() && 
+            node->lineno < localLines[localKey]) {
+            addError("'" + varName + "' is not defined yet", node->lineno);
+            //return;
+        }
+    }
+    
+    // Continue with type checking
     std::string lhsType = getExpressionType(leftNode);
-    if (lhsType.empty()) return;
+    //if (lhsType.empty()) return;
     
     std::string rhsType = getExpressionType(rightNode);
-    if (rhsType.empty()) return;
+    //if (rhsType.empty()) return;
     
     if (!areTypesCompatible(lhsType, rhsType)) {
-        // Use the new helper function to get better error messages
+        // Use the helper function to get better error messages
         std::string leftName = getExpressionName(leftNode);
         std::string rightName = getExpressionName(rightNode);
         
@@ -446,7 +492,7 @@ void SemanticAnalyzer::checkReturnType(Node* node) {
     auto returnExpr = node->children.front();
     std::string actualType = getExpressionType(returnExpr);
     
-    if (actualType.empty()) return; // Error already reported
+    //if (actualType.empty()) return; // Error already reported
     
     // Check if types are compatible
     if (!areTypesCompatible(expectedType, actualType)) {
@@ -476,9 +522,7 @@ void SemanticAnalyzer::checkConditions(Node* node) {
 }
 
 void SemanticAnalyzer::addError(const std::string& message, int lineNo) {
-    std::string error = "Line " + std::to_string(lineNo) + ": semantic (" + message + ")";
-    
-    // Only add if this exact error isn't already in the list
+    std::string error = "@error at line " + std::to_string(lineNo) + ". semantic (" + message + ")";
     if (std::find(errors.begin(), errors.end(), error) == errors.end()) {
         errors.push_back(error);
     }
