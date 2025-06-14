@@ -68,6 +68,12 @@ void SemanticAnalyzer::analyze(Node* node) {
     else if (node->type == "ArrayAccess") {
         checkArrayAccess(node);
     }
+    else if (node->type == "ArrayAssignment") {
+        checkArrayAssignment(node);
+    }
+    else if (node->type == "VarDeclaration" && node->children.size() >= 2) {
+        checkLocalVarDeclaration(node);
+    }
     else if (node->type == "Return") {
         checkReturnType(node);
     }
@@ -206,7 +212,7 @@ bool SemanticAnalyzer::isBooleanType(const std::string& type) const {
 }
 
 bool SemanticAnalyzer::isArrayType(const std::string& type) const {
-    return type == "int[]";
+    return type.size() > 2 && type.substr(type.size() - 2) == "[]";
 }
 
 bool SemanticAnalyzer::isClassType(const std::string& type) const {
@@ -354,6 +360,18 @@ std::string SemanticAnalyzer::getExpressionType(Node* node) {
         auto methodRecord = std::dynamic_pointer_cast<MethodRecord>(methodIt->second);
         if (methodRecord) {
             return methodRecord->returnType;
+        }
+        return "";
+    }
+    if (node->type == "LengthExpression") {
+        auto it = node->children.begin();
+        if (it != node->children.end()) {
+            std::string arrType = getExpressionType(*it);
+            if (!isArrayType(arrType)) {
+                addError("member .length is used incorrectly", node->lineno);
+                return "";
+            }
+            return "int";
         }
         return "";
     }
@@ -524,7 +542,7 @@ void SemanticAnalyzer::checkArrayAccess(Node* node) {
 
 void SemanticAnalyzer::checkReturnType(Node* node) {
     if (!node || node->type != "Return") return;
-    
+
     // Get the expected return type from the current method
     auto classRecord = symbolTable.getClass(currentClass);
     if (!classRecord) return;
@@ -548,18 +566,10 @@ void SemanticAnalyzer::checkReturnType(Node* node) {
     // Get the actual return expression type
     auto returnExpr = node->children.front();
     std::string actualType = getExpressionType(returnExpr);
-    
-    //if (actualType.empty()) return; // Error already reported
-    
+
     // Check if types are compatible
     if (!areTypesCompatible(expectedType, actualType)) {
-        // Use method-specific error messages to match expected @error comments
-
-        if (currentMethod == "swFunc") {
-            addError("invalid type in the return statement", node->lineno);
-        } else {
-            addError("invalid return type", node->lineno);
-        }
+        addError("type mismatch in return statement", node->lineno);
     }
 }
 
@@ -598,5 +608,30 @@ void SemanticAnalyzer::collectDeclarations(Node* node) {
         for (auto child : node->children) {
             collectDeclarations(child);
         }
+    }
+}
+
+void SemanticAnalyzer::checkArrayAssignment(Node* node) {
+    if (!node || node->type != "ArrayAssignment" || node->children.size() < 2) return;
+    
+    auto arrayExpr = node->children.front();
+    auto indexExpr = *(++node->children.begin());
+    auto valueExpr = *(++(++node->children.begin()));
+    
+    std::string arrayType = getExpressionType(arrayExpr);
+    if (!arrayType.empty() && !isArrayType(arrayType)) {
+        addError("array assignment on non-array type '" + arrayType + "'", node->lineno);
+    }
+    
+    std::string indexType = getExpressionType(indexExpr);
+    std::cout << "DEBUG: Array index type is '" << indexType << "'" << std::endl;
+
+    if (!indexType.empty() && !isIntegerType(indexType)) {
+        addError("array index must be an integer, but got '" + indexType + "'", indexExpr->lineno);
+    }
+    
+    std::string valueType = getExpressionType(valueExpr);
+    if (!valueType.empty() && !areTypesCompatible("int", valueType)) {
+        addError("array assignment value must be an integer, but got '" + valueType + "'", valueExpr->lineno);
     }
 }

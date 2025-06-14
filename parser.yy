@@ -170,7 +170,7 @@ method_body: non_return_statement_list return_statement
 
 return_statement: RETURN expression SEMICOLON
     {
-        $$ = new Node("ReturnStatement", "", yylineno);
+        $$ = new Node("Return", "", yylineno);
         $$->children.push_back($2);
     };
 
@@ -363,8 +363,8 @@ expression: expression PLUSOP expression {      /*
             { 
                 $$ = new Node("Identifier", $1, yylineno); 
             }
-            | TRUE         { $$ = new Node("True", "", yylineno); /* printf("r8 "); */}
-            | FALSE        { $$ = new Node("False", "", yylineno); /* printf("r9 "); */}
+            | TRUE         { $$ = new Node("BooleanLiteral", "true", yylineno); /* printf("r8 "); */}
+            | FALSE        { $$ = new Node("BooleanLiteral", "false", yylineno); /* printf("r9 "); */}
             | THIS         { $$ = new Node("This", "", yylineno); /* printf("r10 "); */}
             | INTLITERAL { $$ = new Node("IntegerLiteral", $1, yylineno); /* printf("r12 "); */}
             | NEW ID LP RP { $$ = new Node("NewObject", "", yylineno);

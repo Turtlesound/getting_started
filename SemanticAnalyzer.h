@@ -52,6 +52,7 @@ private:
     void checkParameterDeclaration(Node* node);
     std::string getExpressionName(Node* node);
     void collectDeclarations(Node* node);
+    void checkArrayAssignment(Node* node);
     
     // Error reporting
     void addError(const std::string& message, int lineNo);
