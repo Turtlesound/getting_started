@@ -232,7 +232,7 @@ std::string SemanticAnalyzer::getExpressionName(Node* node) {
 // Update getExpressionType to provide better error messages for undefined methods
 std::string SemanticAnalyzer::getExpressionType(Node* node) {
     if (!node) return "";
-    
+
     // Handle different node types
     if (node->type == "IntegerLiteral") {
         return "int";
@@ -277,7 +277,6 @@ std::string SemanticAnalyzer::getExpressionType(Node* node) {
                                 addError("'" + identifierName + "' is not defined yet", node->lineno);
                                 return "";
                             }
-                            
                             auto varRecord = std::dynamic_pointer_cast<VarRecord>(localIt->second);
                             if (varRecord) {
                                 return varRecord->type;
@@ -312,7 +311,32 @@ std::string SemanticAnalyzer::getExpressionType(Node* node) {
         addError("'" + identifierName + "' does not exist in the current scope", node->lineno);
         return "";
     }
-    
+    if (node->type == "MethodCall" && node->children.size() >= 2) {
+        auto objExpr = node->children.front();
+        auto methodNameNode = *(++node->children.begin());
+        std::string objType = getExpressionType(objExpr);
+        if (objType.empty()) return "";
+
+        auto classRecord = symbolTable.getClass(objType);
+        if (!classRecord) {
+            addError("method call on non-class type '" + objType + "'", node->lineno);
+            return "";
+        }
+
+        std::string methodName = methodNameNode->value;
+        auto methodIt = classRecord->methods.find(methodName);
+        if (methodIt == classRecord->methods.end()) {
+            addError("'" + methodName + "' does not exist", node->lineno);
+            return "";
+        }
+
+        auto methodRecord = std::dynamic_pointer_cast<MethodRecord>(methodIt->second);
+        if (methodRecord) {
+            return methodRecord->returnType;
+        }
+        return "";
+    }
+
     // Handle other node types...
     
     return "";
@@ -408,38 +432,50 @@ void SemanticAnalyzer::checkAssignment(Node* node) {
         std::string methodKey = currentClass + "." + currentMethod;
         std::string localKey = methodKey + "." + varName;
         
-        // Check if it's a parameter (parameters are always valid)
-        bool isParameter = false;
-        if (!currentClass.empty() && !currentMethod.empty()) {
+        // Check if this is a local variable (not a field or parameter)
+        bool isLocal = false;
+        bool existsAsField = false;
+        
+        // First check if it's a field in the current class
+        if (!currentClass.empty()) {
+            auto classRecord = symbolTable.getClass(currentClass);
+            if (classRecord && classRecord->fields.find(varName) != classRecord->fields.end()) {
+                existsAsField = true;
+            }
+        }
+        
+        // Then check if it's a local variable
+        if (!existsAsField && !currentClass.empty() && !currentMethod.empty()) {
             auto classRecord = symbolTable.getClass(currentClass);
             if (classRecord) {
                 auto methodIt = classRecord->methods.find(currentMethod);
                 if (methodIt != classRecord->methods.end()) {
                     auto methodRecord = std::dynamic_pointer_cast<MethodRecord>(methodIt->second);
-                    if (methodRecord && methodRecord->params.find(varName) != methodRecord->params.end()) {
-                        isParameter = true;
+                    // Skip parameters - they're always in scope
+                    if (methodRecord && methodRecord->params.find(varName) == methodRecord->params.end() && 
+                        methodRecord->locals.find(varName) != methodRecord->locals.end()) {
+                        isLocal = true;
                     }
                 }
             }
         }
-        
-        // If it's not a parameter, check if it's a local variable used before declaration
-        if (!isParameter && localLines.find(localKey) != localLines.end() && 
+
+        // Only check "used before declared" for local variables, not fields or parameters
+        if (isLocal && localLines.find(localKey) != localLines.end() && 
             node->lineno < localLines[localKey]) {
             addError("'" + varName + "' is not defined yet", node->lineno);
-            //return;
+            return; // Return early after detecting an error
         }
     }
     
     // Continue with type checking
     std::string lhsType = getExpressionType(leftNode);
-    //if (lhsType.empty()) return;
+    if (lhsType.empty()) return; // Return early if left-hand type couldn't be determined
     
     std::string rhsType = getExpressionType(rightNode);
-    //if (rhsType.empty()) return;
+    if (rhsType.empty()) return; // Return early if right-hand type couldn't be determined
     
     if (!areTypesCompatible(lhsType, rhsType)) {
-        // Use the helper function to get better error messages
         std::string leftName = getExpressionName(leftNode);
         std::string rightName = getExpressionName(rightNode);
         
@@ -522,7 +558,9 @@ void SemanticAnalyzer::checkConditions(Node* node) {
 }
 
 void SemanticAnalyzer::addError(const std::string& message, int lineNo) {
-    std::string error = "@error at line " + std::to_string(lineNo) + ". semantic (" + message + ")";
+    std::string error = "Line " + std::to_string(lineNo) + ": semantic (" + message + ")";
+    
+    // Only add if this exact error isn't already in the list
     if (std::find(errors.begin(), errors.end(), error) == errors.end()) {
         errors.push_back(error);
     }
