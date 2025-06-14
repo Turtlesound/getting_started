@@ -1,11 +1,25 @@
 digraph SymbolTable {
   node [shape=record];
-  DuplicateIdentifiers [label="{Class: DuplicateIdentifiers|{Fields|none}|{Methods|func: int}}"];
-  DuplicateIdentifiers_func [label="{Method: func|Return Type: int|{Parameters|none}|{Locals|none}}"];
-  DuplicateIdentifiers -> DuplicateIdentifiers_func;
-  MyClass [label="{Class: MyClass|{Fields|none}|{Methods|Pen: int\lPen2: int}}"];
-  MyClass_Pen [label="{Method: Pen|Return Type: int|{Parameters|param: int}|{Locals|none}}"];
-  MyClass -> MyClass_Pen;
-  MyClass_Pen2 [label="{Method: Pen2|Return Type: int|{Parameters|param: int}|{Locals|none}}"];
-  MyClass -> MyClass_Pen2;
+  MyClass [label="{Class: MyClass|{Fields|a: int\lb: boolean\lc: int[]\ld: classdata}|{Methods|EFUNC: boolean\laFunc: int\lbFunc: boolean\lcFunc: int[]\ldFunc: classdata}}"];
+  MyClass_EFUNC [label="{Method: EFUNC|Return Type: boolean|{Parameters|none}|{Locals|none}}"];
+  MyClass -> MyClass_EFUNC;
+  MyClass_aFunc [label="{Method: aFunc|Return Type: int|{Parameters|none}|{Locals|none}}"];
+  MyClass -> MyClass_aFunc;
+  MyClass_bFunc [label="{Method: bFunc|Return Type: boolean|{Parameters|none}|{Locals|none}}"];
+  MyClass -> MyClass_bFunc;
+  MyClass_cFunc [label="{Method: cFunc|Return Type: int[]|{Parameters|none}|{Locals|none}}"];
+  MyClass -> MyClass_cFunc;
+  MyClass_dFunc [label="{Method: dFunc|Return Type: classdata|{Parameters|none}|{Locals|none}}"];
+  MyClass -> MyClass_dFunc;
+  VarUsedBeforeDefinition [label="{Class: VarUsedBeforeDefinition|{Fields|a: int}|{Methods|b: int}}"];
+  VarUsedBeforeDefinition_b [label="{Method: b|Return Type: int|{Parameters|b: int}|{Locals|c: int}}"];
+  VarUsedBeforeDefinition -> VarUsedBeforeDefinition_b;
+  classdata [label="{Class: classdata|{Fields|pem: classthatdoesntExist\lpen: thatdoExist\lx: int\ly: boolean\lz: int[]}|{Methods|xFunc: int\lyFunc: boolean\lzFunc: int[]}}"];
+  classdata_xFunc [label="{Method: xFunc|Return Type: int|{Parameters|none}|{Locals|none}}"];
+  classdata -> classdata_xFunc;
+  classdata_yFunc [label="{Method: yFunc|Return Type: boolean|{Parameters|none}|{Locals|none}}"];
+  classdata -> classdata_yFunc;
+  classdata_zFunc [label="{Method: zFunc|Return Type: int[]|{Parameters|none}|{Locals|none}}"];
+  classdata -> classdata_zFunc;
+  thatdoExist [label="{Class: thatdoExist|{Fields|a: int}|{Methods|none}}"];
 }

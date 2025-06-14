@@ -35,6 +35,15 @@ void SemanticAnalyzer::analyze(Node* node) {
             // Check for duplicate method AFTER setting context
             checkMethodDeclaration(node);
         }
+        
+        // For method bodies, first collect all variable declarations
+        // to properly handle variable-before-declaration checks
+        for (auto child : node->children) {
+            if (child->type == "MethodBody") {
+                // First pass: process all declarations
+                collectDeclarations(child);
+            }
+        }
     }
     else if (node->type == "VarDeclaration") {
         // Check if the type is a valid class
@@ -169,11 +178,20 @@ void SemanticAnalyzer::checkLocalVarDeclaration(Node* node) {
         return; // Return early to avoid adding it to localLines
     }
     
-    // Check if it's a duplicate local
+    // Check if it's a duplicate local in the SAME class and method
     std::string localKey = methodKey + "." + varName;
+    
+    // Check if this is a true duplicate (previously declared in the same scope)
+    // or if it was used before declaration (which should be handled in checkAssignment)
     if (localLines.find(localKey) != localLines.end()) {
-        addError("Already Declared variable: '" + varName + "'", node->lineno);
+        // If we already recorded this variable and the current line is not
+        // the same as the recorded line, then it's a duplicate declaration
+        if (localLines[localKey] != node->lineno) {
+            addError("Already Declared variable: '" + varName + "'", node->lineno);
+        }
+        // Otherwise, it's just the variable we're processing now
     } else {
+        // New variable declaration - record it
         localLines[localKey] = node->lineno;
     }
 }
@@ -242,6 +260,9 @@ std::string SemanticAnalyzer::getExpressionType(Node* node) {
     }
     else if (node->type == "StringLiteral") {
         return "String";
+    }
+    else if (node->type == "This") {  // Add this case to handle 'this' keyword
+        return currentClass;
     }
     else if (node->type == "ThisExpression") {
         return currentClass;
@@ -563,5 +584,19 @@ void SemanticAnalyzer::addError(const std::string& message, int lineNo) {
     // Only add if this exact error isn't already in the list
     if (std::find(errors.begin(), errors.end(), error) == errors.end()) {
         errors.push_back(error);
+    }
+}
+
+void SemanticAnalyzer::collectDeclarations(Node* node) {
+    if (!node) return;
+    
+    if (node->type == "VarDeclaration") {
+        // Process the declaration first to register it in the symbol table
+        checkLocalVarDeclaration(node);
+    } else {
+        // Process all children to find declarations
+        for (auto child : node->children) {
+            collectDeclarations(child);
+        }
     }
 }

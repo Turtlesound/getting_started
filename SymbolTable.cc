@@ -81,6 +81,15 @@ void SymbolTable::processNode(Node* node) {
         
         currentClass = "";
     }
+    else if (node->type == "VarDeclaration" && node->children.size() >= 2) {
+        // Handle variable declarations (including class fields)
+        std::string varType = node->children.front()->value;
+        std::string varName = node->children.back()->value;
+        
+        // Add variable to symbol table
+        // When currentMethod is empty, it will be added as a class field
+        addVariable(varName, varType, false);
+    }
     else if (node->type == "MethodDeclaration" && !node->children.empty()) {
         auto it = node->children.begin();
         if ((*it)->type == "Public") ++it;
