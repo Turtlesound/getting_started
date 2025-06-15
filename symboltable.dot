@@ -1,8 +1,0 @@
-digraph SymbolTable {
-  node [shape=record];
-  A [label="{Class: A|{Fields|none}|{Methods|a1: A\la2: int[]}}"];
-  A_a1 [label="{Method: a1|Return Type: A|{Parameters|num: int}|{Locals|num_aux: int[]}}"];
-  A -> A_a1;
-  A_a2 [label="{Method: a2|Return Type: int[]|{Parameters|none}|{Locals|a: int}}"];
-  A -> A_a2;
-}
