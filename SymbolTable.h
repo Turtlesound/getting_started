@@ -38,6 +38,8 @@ public:
 // Method record
 class MethodRecord : public Record {
 public:
+    // Add this vector to track parameter order
+    std::vector<std::string> paramOrder;
     std::string returnType;
     std::map<std::string, std::shared_ptr<Record>> params;
     std::map<std::string, std::shared_ptr<Record>> locals;

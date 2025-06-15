@@ -149,7 +149,10 @@ void SymbolTable::addMethod(const std::string& name, const std::string& returnTy
     if (currentClass.empty() || classes.find(currentClass) == classes.end()) {
         return;
     }
-    
+    // Prevent duplicate method registration
+    if (classes[currentClass]->methods.find(name) != classes[currentClass]->methods.end()) {
+        return; // Do not add duplicate method
+    }
     auto method = std::make_shared<MethodRecord>(name, returnType);
     classes[currentClass]->methods[name] = method;
 }
@@ -164,38 +167,46 @@ void SymbolTable::addVariable(const std::string& name, const std::string& type, 
         std::cerr << "Error: Cannot add variable outside a class" << std::endl;
         return;
     }
-    
     auto classRecord = getClass(currentClass);
     if (!classRecord) {
         std::cerr << "Error: Class " << currentClass << " not found" << std::endl;
         return;
     }
-    
-    // Create the variable record
     auto varRecord = std::make_shared<VarRecord>(name, type, isParam);
-    
-    // Add to the appropriate scope
     if (currentMethod.empty()) {
         // Class field
+        if (classRecord->fields.find(name) != classRecord->fields.end()) {
+            return; // Do not add duplicate field
+        }
         classRecord->fields[name] = varRecord;
     } else {
-        // Method parameter or local variable
         auto methodIt = classRecord->methods.find(currentMethod);
         if (methodIt == classRecord->methods.end()) {
             std::cerr << "Error: Method " << currentMethod << " not found in class " << currentClass << std::endl;
             return;
         }
-        
         auto methodRecord = std::dynamic_pointer_cast<MethodRecord>(methodIt->second);
         if (!methodRecord) {
             std::cerr << "Error: Failed to cast to MethodRecord" << std::endl;
             return;
         }
-        
         if (isParam) {
-            std::cout << "DEBUG: Adding parameter " << name << " to method " << currentMethod << std::endl;
+            // Always add the parameter name to paramOrder to reflect the declared arity.
+            // The semantic analyzer will handle reporting duplicate parameter names separately.
+            methodRecord->paramOrder.push_back(name);
+
+            if (methodRecord->params.find(name) != methodRecord->params.end()) {
+                // This is a duplicate parameter name.
+                // The semantic analyzer (e.g., checkParameterDeclaration) is responsible for reporting this error.
+                // We've already added it to paramOrder for arity checking.
+                // We don't add it to the 'params' map again, as the map stores unique names (the first one wins).
+                return; 
+            }
             methodRecord->params[name] = varRecord;
         } else {
+            if (methodRecord->locals.find(name) != methodRecord->locals.end()) {
+                return; // Do not add duplicate local
+            }
             methodRecord->locals[name] = varRecord;
         }
     }

@@ -31,6 +31,9 @@ private:
     // Set to track processed nodes to avoid duplicates
     std::set<Node*> processedNodes;
     
+    // Add this member variable to track duplicate methods
+    std::set<std::string> duplicateMethods;
+    
     // Helper methods for type checking
     bool isIntegerType(const std::string& type) const;
     bool isBooleanType(const std::string& type) const;
@@ -56,6 +59,9 @@ private:
     
     // Error reporting
     void addError(const std::string& message, int lineNo);
+    
+    // Duplicate method check
+    bool isDuplicateMethod(const std::string& className, const std::string& methodName) const;
 };
 
 #endif // SEMANTIC_ANALYZER_H

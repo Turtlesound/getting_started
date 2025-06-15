@@ -273,6 +273,19 @@ std::string SemanticAnalyzer::getExpressionType(Node* node) {
     else if (node->type == "ThisExpression") {
         return currentClass;
     }
+    else if (node->type == "NewObject" && !node->children.empty()) {
+        // For expressions like "new ClassName()"
+        auto classNameNode = node->children.front();
+        if (classNameNode->type == "Identifier") {
+            std::string className = classNameNode->value;
+            if (!symbolTable.isClassDeclared(className)) {
+                addError("'" + className + "' is undefined", node->lineno);
+                return "";
+            }
+            return className;
+        }
+        return "";
+    }
     else if (node->type == "Identifier") {
         std::string identifierName = node->value;
         
@@ -284,12 +297,11 @@ std::string SemanticAnalyzer::getExpressionType(Node* node) {
                 if (methodIt != classRecord->methods.end()) {
                     auto methodRecord = std::dynamic_pointer_cast<MethodRecord>(methodIt->second);
                     if (methodRecord) {
-                        // Check parameters first with clearer logging
+                        // Check parameters first
                         auto paramIt = methodRecord->params.find(identifierName);
                         if (paramIt != methodRecord->params.end()) {
                             auto varRecord = std::dynamic_pointer_cast<VarRecord>(paramIt->second);
                             if (varRecord) {
-                                // It's a parameter, always valid
                                 return varRecord->type;
                             }
                         }
@@ -328,17 +340,16 @@ std::string SemanticAnalyzer::getExpressionType(Node* node) {
             }
         }
         
-        // Finally, check global scope
-        auto record = symbolTable.lookup(identifierName);
-        if (record) {
-            return record->type;
+        // Finally, check if it's a class name
+        if (symbolTable.isClassDeclared(identifierName)) {
+            return identifierName;
         }
         
         // Not found
         addError("'" + identifierName + "' does not exist in the current scope", node->lineno);
         return "";
     }
-    if (node->type == "MethodCall" && node->children.size() >= 2) {
+    else if (node->type == "MethodCall" && node->children.size() >= 2) {
         auto objExpr = node->children.front();
         auto methodNameNode = *(++node->children.begin());
         std::string objType = getExpressionType(objExpr);
@@ -353,30 +364,159 @@ std::string SemanticAnalyzer::getExpressionType(Node* node) {
         std::string methodName = methodNameNode->value;
         auto methodIt = classRecord->methods.find(methodName);
         if (methodIt == classRecord->methods.end()) {
-            addError("'" + methodName + "' does not exist", node->lineno);
+            addError("'" + methodName + "' does not exist in class '" + objType + "'", node->lineno);
             return "";
         }
 
         auto methodRecord = std::dynamic_pointer_cast<MethodRecord>(methodIt->second);
         if (methodRecord) {
+            // Validate method parameters while evaluating the expression type
+            checkMethodCall(node);
             return methodRecord->returnType;
         }
         return "";
     }
-    if (node->type == "LengthExpression") {
+    else if (node->type == "ArrayAccess" && node->children.size() >= 2) {
+        auto arrayExpr = node->children.front();
+        std::string arrayType = getExpressionType(arrayExpr);
+        
+        // Check if array index is an integer
+        auto indexExpr = *(++node->children.begin());
+        std::string indexType = getExpressionType(indexExpr);
+        if (!indexType.empty() && indexType != "int") {
+            addError("array index must be an integer, got '" + indexType + "'", indexExpr->lineno);
+        }
+        
+        // If it's an array type, return the element type
+        if (isArrayType(arrayType)) {
+            return arrayType.substr(0, arrayType.length() - 2); // Remove the []
+        } else {
+            addError("array access on non-array type '" + arrayType + "'", node->lineno);
+            return "";
+        }
+    }
+    else if (node->type == "LengthExpression" && !node->children.empty()) {
+        auto arrayExpr = node->children.front();
+        std::string arrayType = getExpressionType(arrayExpr);
+        
+        if (!isArrayType(arrayType)) {
+            addError("member .length used on non-array type '" + arrayType + "'", node->lineno);
+            return "";
+        }
+        
+        return "int";
+    }
+    else if (node->type == "NewArray" && node->children.size() >= 1) {
+        // Check that array size is an integer
+        auto sizeExpr = node->children.front();
+        std::string sizeType = getExpressionType(sizeExpr);
+        
+        if (!sizeType.empty() && sizeType != "int") {
+            addError("array size must be an integer, got '" + sizeType + "'", sizeExpr->lineno);
+        }
+        
+        return "int[]"; // Default to int array
+    }
+    else if (node->type == "NewIntArray" && node->children.size() >= 3) {
+        // Get the third child using iterator
         auto it = node->children.begin();
-        if (it != node->children.end()) {
-            std::string arrType = getExpressionType(*it);
-            if (!isArrayType(arrType)) {
-                addError("member .length is used incorrectly", node->lineno);
+        std::advance(it, 2); // Advance to third element (index 2)
+        auto sizeExpr = *it;
+        
+        std::string sizeType = getExpressionType(sizeExpr);
+        
+        if (!sizeType.empty() && sizeType != "int") {
+            addError("array size must be an integer, got '" + sizeType + "'", sizeExpr->lineno);
+        }
+        
+        return "int[]"; 
+    }
+    else if (node->type == "AddExpression" || node->type == "SubExpression" || 
+             node->type == "MultExpression" || node->type == "DivExpression" || 
+             node->type == "ModExpression") {
+        if (node->children.size() >= 2) {
+            auto leftExpr = node->children.front();
+            auto rightExpr = *(++node->children.begin());
+            
+            std::string leftType = getExpressionType(leftExpr);
+            std::string rightType = getExpressionType(rightExpr);
+            
+            if (leftType != "int" || rightType != "int") {
+                addError("arithmetic operation requires integer operands", node->lineno);
                 return "";
             }
+            
             return "int";
         }
         return "";
     }
-
-    // Handle other node types...
+    else if (node->type == "LessThanExpression" || node->type == "GreaterThanExpression") {
+        if (node->children.size() >= 2) {
+            auto leftExpr = node->children.front();
+            auto rightExpr = *(++node->children.begin());
+            
+            std::string leftType = getExpressionType(leftExpr);
+            std::string rightType = getExpressionType(rightExpr);
+            
+            if (leftType != "int" || rightType != "int") {
+                addError("comparison operation requires integer operands", node->lineno);
+                return "";
+            }
+            
+            return "boolean";
+        }
+        return "";
+    }
+    else if (node->type == "EqualExpression") {
+        if (node->children.size() >= 2) {
+            auto leftExpr = node->children.front();
+            auto rightExpr = *(++node->children.begin());
+            
+            std::string leftType = getExpressionType(leftExpr);
+            std::string rightType = getExpressionType(rightExpr);
+            
+            if (leftType != rightType) {
+                addError("equality comparison requires operands of same type", node->lineno);
+                return "";
+            }
+            
+            return "boolean";
+        }
+        return "";
+    }
+    else if (node->type == "AndExpression" || node->type == "OrExpression") {
+        if (node->children.size() >= 2) {
+            auto leftExpr = node->children.front();
+            auto rightExpr = *(++node->children.begin());
+            
+            std::string leftType = getExpressionType(leftExpr);
+            std::string rightType = getExpressionType(rightExpr);
+            
+            if (leftType != "boolean" || rightType != "boolean") {
+                addError("logical operation requires boolean operands", node->lineno);
+                return "";
+            }
+            
+            return "boolean";
+        }
+        return "";
+    }
+    else if (node->type == "NotExpression" && !node->children.empty()) {
+        auto expr = node->children.front();
+        std::string exprType = getExpressionType(expr);
+        
+        if (exprType != "boolean") {
+            addError("logical not operation requires boolean operand", node->lineno);
+            return "";
+        }
+        
+        return "boolean";
+    }
+    
+    // For any other node types, recursively process children
+    for (auto child : node->children) {
+        getExpressionType(child);
+    }
     
     return "";
 }
@@ -411,7 +551,8 @@ void SemanticAnalyzer::checkMethodCall(Node* node) {
     auto methodRecord = std::dynamic_pointer_cast<MethodRecord>(methodIt->second);
     if (!methodRecord) return;
     
-    size_t expectedParamCount = methodRecord->params.size();
+    // FIX: Use paramOrder.size() instead of params.size() to correctly count parameters
+    size_t expectedParamCount = methodRecord->paramOrder.size();
     size_t actualArgCount = 0;
     std::vector<Node*> argNodes;
     
@@ -419,7 +560,6 @@ void SemanticAnalyzer::checkMethodCall(Node* node) {
     if (node->children.size() > 2) {
         auto thirdChild = *(++(++node->children.begin()));
         
-        // FIXED: Check for ExpressionList instead of ArgumentList
         if (thirdChild->type == "ExpressionList") {
             // Count the actual expressions in the ExpressionList
             actualArgCount = thirdChild->children.size();
@@ -452,10 +592,35 @@ void SemanticAnalyzer::checkMethodCall(Node* node) {
         return;
     }
     
-    // Check each argument type if any exist
+    // Check each argument type against parameter type
     if (!argNodes.empty()) {
-        // Implement argument type checking here
-        // ...
+        std::vector<std::string> paramTypes;
+        std::vector<std::string> paramNames;
+        
+        // Collect parameters in declaration order
+        for (const auto& paramName : methodRecord->paramOrder) {
+            auto it = methodRecord->params.find(paramName);
+            if (it != methodRecord->params.end()) {
+                auto varRecord = std::dynamic_pointer_cast<VarRecord>(it->second);
+                if (varRecord) {
+                    paramTypes.push_back(varRecord->type);
+                    paramNames.push_back(varRecord->name);
+                }
+            }
+        }
+        
+        // Check each argument against corresponding parameter
+        for (size_t i = 0; i < argNodes.size() && i < paramTypes.size(); ++i) {
+            std::string argType = getExpressionType(argNodes[i]);
+            if (argType.empty()) continue; // Error already reported
+            
+            if (!areTypesCompatible(paramTypes[i], argType)) {
+                std::string argName = getExpressionName(argNodes[i]);
+                addError("invalid parameter '" + argName + "' for method '" + methodName + 
+                         "': expected '" + paramTypes[i] + "', got '" + argType + "'", 
+                         argNodes[i]->lineno);
+            }
+        }
     }
 }
 
@@ -536,13 +701,23 @@ void SemanticAnalyzer::checkArrayAccess(Node* node) {
     
     std::string indexType = getExpressionType(indexExpr);
     if (!indexType.empty() && !isIntegerType(indexType)) {
-        addError("array index must be an integer, but got '" + indexType + "'", indexExpr->lineno);
+        // Use exactly the same message format as in getExpressionType
+        addError("array index must be an integer, got '" + indexType + "'", indexExpr->lineno);
     }
 }
 
 void SemanticAnalyzer::checkReturnType(Node* node) {
     if (!node || node->type != "Return") return;
 
+    // Get the current method's key
+    std::string key = currentClass + "." + currentMethod;
+    
+    // ADDED: Skip return type validation for duplicate methods
+    // Check if this method was already reported as a duplicate
+    if (isDuplicateMethod(currentClass, currentMethod)) {
+        return;
+    }
+    
     // Get the expected return type from the current method
     auto classRecord = symbolTable.getClass(currentClass);
     if (!classRecord) return;
@@ -555,10 +730,13 @@ void SemanticAnalyzer::checkReturnType(Node* node) {
     
     std::string expectedType = methodRecord->returnType;
     
+    // Get the method declaration line number instead of using the return statement line
+    int methodLineNo = methodLines[key]; // Get line where method was declared
+    
     // If return has no expression (void return)
     if (node->children.empty()) {
         if (expectedType != "void") {
-            addError("invalid return type", node->lineno);
+            addError("invalid return type", methodLineNo); // Use method line number
         }
         return;
     }
@@ -569,7 +747,7 @@ void SemanticAnalyzer::checkReturnType(Node* node) {
 
     // Check if types are compatible
     if (!areTypesCompatible(expectedType, actualType)) {
-        addError("type mismatch in return statement", node->lineno);
+        addError("invalid return type", methodLineNo); // Use method line number
     }
 }
 
@@ -589,7 +767,11 @@ void SemanticAnalyzer::checkConditions(Node* node) {
 }
 
 void SemanticAnalyzer::addError(const std::string& message, int lineNo) {
-    std::string error = "Line " + std::to_string(lineNo) + ": semantic (" + message + ")";
+    // Change from the current format:
+    // std::string error = "Line " + std::to_string(lineNo) + ": semantic (" + message + ")";
+    
+    // To the format expected by testScript.py:
+    std::string error = "@error at line " + std::to_string(lineNo) + ". " + message;
     
     // Only add if this exact error isn't already in the list
     if (std::find(errors.begin(), errors.end(), error) == errors.end()) {
@@ -634,4 +816,18 @@ void SemanticAnalyzer::checkArrayAssignment(Node* node) {
     if (!valueType.empty() && !areTypesCompatible("int", valueType)) {
         addError("array assignment value must be an integer, but got '" + valueType + "'", valueExpr->lineno);
     }
+}
+
+// NEW helper function to check if a method is a duplicate
+bool SemanticAnalyzer::isDuplicateMethod(const std::string& className, const std::string& methodName) const {
+    // Check if we've already reported this method as a duplicate
+    std::string key = className + "." + methodName;
+    
+    // Count how many times this method appears in our error list
+    for (const auto& error : errors) {
+        if (error.find("Already Declared Function: '" + methodName + "'") != std::string::npos) {
+            return true;
+        }
+    }
+    return false;
 }

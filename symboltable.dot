@@ -1,0 +1,11 @@
+digraph SymbolTable {
+  node [shape=record];
+  DuplicateIdentifiers [label="{Class: DuplicateIdentifiers|{Fields|a: int}|{Methods|func: boolean}}"];
+  DuplicateIdentifiers_func [label="{Method: func|Return Type: boolean|{Parameters|none}|{Locals|none}}"];
+  DuplicateIdentifiers -> DuplicateIdentifiers_func;
+  MyClass [label="{Class: MyClass|{Fields|b: boolean}|{Methods|Pen: int\lPen2: int}}"];
+  MyClass_Pen [label="{Method: Pen|Return Type: int|{Parameters|param: int}|{Locals|none}}"];
+  MyClass -> MyClass_Pen;
+  MyClass_Pen2 [label="{Method: Pen2|Return Type: int|{Parameters|param: int}|{Locals|param: int}}"];
+  MyClass -> MyClass_Pen2;
+}
