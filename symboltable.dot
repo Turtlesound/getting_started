@@ -1,25 +1,8 @@
 digraph SymbolTable {
   node [shape=record];
-  MyClass [label="{Class: MyClass|{Fields|a: int\lb: boolean\lc: int[]\ld: classdata}|{Methods|EFUNC: boolean\laFunc: int\lbFunc: boolean\lcFunc: int[]\ldFunc: classdata}}"];
-  MyClass_EFUNC [label="{Method: EFUNC|Return Type: boolean|{Parameters|none}|{Locals|none}}"];
-  MyClass -> MyClass_EFUNC;
-  MyClass_aFunc [label="{Method: aFunc|Return Type: int|{Parameters|none}|{Locals|none}}"];
-  MyClass -> MyClass_aFunc;
-  MyClass_bFunc [label="{Method: bFunc|Return Type: boolean|{Parameters|none}|{Locals|none}}"];
-  MyClass -> MyClass_bFunc;
-  MyClass_cFunc [label="{Method: cFunc|Return Type: int[]|{Parameters|none}|{Locals|none}}"];
-  MyClass -> MyClass_cFunc;
-  MyClass_dFunc [label="{Method: dFunc|Return Type: classdata|{Parameters|none}|{Locals|none}}"];
-  MyClass -> MyClass_dFunc;
-  VarUsedBeforeDefinition [label="{Class: VarUsedBeforeDefinition|{Fields|a: int}|{Methods|b: int}}"];
-  VarUsedBeforeDefinition_b [label="{Method: b|Return Type: int|{Parameters|b: int}|{Locals|c: int}}"];
-  VarUsedBeforeDefinition -> VarUsedBeforeDefinition_b;
-  classdata [label="{Class: classdata|{Fields|pem: classthatdoesntExist\lpen: thatdoExist\lx: int\ly: boolean\lz: int[]}|{Methods|xFunc: int\lyFunc: boolean\lzFunc: int[]}}"];
-  classdata_xFunc [label="{Method: xFunc|Return Type: int|{Parameters|none}|{Locals|none}}"];
-  classdata -> classdata_xFunc;
-  classdata_yFunc [label="{Method: yFunc|Return Type: boolean|{Parameters|none}|{Locals|none}}"];
-  classdata -> classdata_yFunc;
-  classdata_zFunc [label="{Method: zFunc|Return Type: int[]|{Parameters|none}|{Locals|none}}"];
-  classdata -> classdata_zFunc;
-  thatdoExist [label="{Class: thatdoExist|{Fields|a: int}|{Methods|none}}"];
+  A [label="{Class: A|{Fields|none}|{Methods|a1: A\la2: int[]}}"];
+  A_a1 [label="{Method: a1|Return Type: A|{Parameters|num: int}|{Locals|num_aux: int[]}}"];
+  A -> A_a1;
+  A_a2 [label="{Method: a2|Return Type: int[]|{Parameters|none}|{Locals|a: int}}"];
+  A -> A_a2;
 }
