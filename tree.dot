@@ -1,79 +1,99 @@
 digraph {
 n0 [label="Goal:"];
 n1 [label="MainClass:"];
-n2 [label="Identifier:E"];
+n2 [label="Identifier:D1"];
 n1 -> n2
-n3 [label="Block:"];
-n4 [label="StatementList:"];
-n5 [label="PrintStatement:"];
-n6 [label="AddExpression:"];
-n7 [label="SubExpression:"];
-n8 [label="AddExpression:"];
-n9 [label="MultExpression:"];
-n10 [label="IntegerLiteral:4"];
-n9 -> n10
-n11 [label="IntegerLiteral:2"];
-n9 -> n11
-n8 -> n9
-n12 [label="IntegerLiteral:10"];
-n8 -> n12
-n7 -> n8
-n13 [label="MultExpression:"];
-n14 [label="IntegerLiteral:2"];
-n13 -> n14
-n15 [label="IntegerLiteral:6"];
-n13 -> n15
-n7 -> n13
-n6 -> n7
-n16 [label="MultExpression:"];
-n17 [label="MultExpression:"];
-n18 [label="SubExpression:"];
-n19 [label="IntegerLiteral:4"];
-n18 -> n19
-n20 [label="IntegerLiteral:1"];
-n18 -> n20
-n17 -> n18
-n21 [label="IntegerLiteral:2"];
-n17 -> n21
-n16 -> n17
-n22 [label="IntegerLiteral:2"];
-n16 -> n22
-n6 -> n16
+n3 [label="PrintStatement:"];
+n4 [label="MethodCall:"];
+n5 [label="NewObject:"];
+n6 [label="Identifier:Sum"];
 n5 -> n6
 n4 -> n5
-n23 [label="PrintStatement:"];
-n24 [label="OrExpression:"];
-n25 [label="EqualExpression:"];
-n26 [label="BooleanLiteral:true"];
-n25 -> n26
-n27 [label="AndExpression:"];
-n28 [label="NotExpression:"];
-n29 [label="BooleanLiteral:true"];
-n28 -> n29
-n27 -> n28
-n30 [label="BooleanLiteral:false"];
-n27 -> n30
-n25 -> n27
-n24 -> n25
-n31 [label="AndExpression:"];
-n32 [label="GreaterThanExpression:"];
-n33 [label="IntegerLiteral:10"];
-n32 -> n33
-n34 [label="IntegerLiteral:1"];
-n32 -> n34
-n31 -> n32
-n35 [label="LessThanExpression:"];
-n36 [label="IntegerLiteral:1"];
-n35 -> n36
-n37 [label="IntegerLiteral:10"];
-n35 -> n37
-n31 -> n35
-n24 -> n31
-n23 -> n24
-n4 -> n23
+n7 [label="Identifier:calcSum"];
+n4 -> n7
+n8 [label="ExpressionList:"];
+n9 [label="IntegerLiteral:100"];
+n8 -> n9
+n4 -> n8
 n3 -> n4
 n1 -> n3
 n0 -> n1
-n38 [label="ClassDeclarationList:"];
-n0 -> n38
+n10 [label="ClassDeclarationList:"];
+n11 [label="ClassDeclaration:"];
+n12 [label="Identifier:Sum"];
+n11 -> n12
+n13 [label="VarDeclarationList:"];
+n11 -> n13
+n14 [label="MethodDeclarationList:"];
+n15 [label="MethodDeclaration:"];
+n16 [label="Public:public"];
+n15 -> n16
+n17 [label="Int:int"];
+n15 -> n17
+n18 [label="Identifier:calcSum"];
+n15 -> n18
+n19 [label="ParameterList:"];
+n20 [label="Parameter:"];
+n21 [label="Int:int"];
+n20 -> n21
+n22 [label="Identifier:num"];
+n20 -> n22
+n19 -> n20
+n15 -> n19
+n23 [label="MethodBody:"];
+n24 [label="StatementList:"];
+n25 [label="VarDeclaration:"];
+n26 [label="Int:int"];
+n25 -> n26
+n27 [label="Identifier:sum"];
+n25 -> n27
+n24 -> n25
+n28 [label="Assignment:"];
+n29 [label="Identifier:sum"];
+n28 -> n29
+n30 [label="IntegerLiteral:0"];
+n28 -> n30
+n24 -> n28
+n31 [label="WhileStatement:"];
+n32 [label="LessThanExpression:"];
+n33 [label="IntegerLiteral:0"];
+n32 -> n33
+n34 [label="Identifier:num"];
+n32 -> n34
+n31 -> n32
+n35 [label="Block:"];
+n36 [label="StatementList:"];
+n37 [label="Assignment:"];
+n38 [label="Identifier:sum"];
+n37 -> n38
+n39 [label="AddExpression:"];
+n40 [label="Identifier:sum"];
+n39 -> n40
+n41 [label="Identifier:num"];
+n39 -> n41
+n37 -> n39
+n36 -> n37
+n42 [label="Assignment:"];
+n43 [label="Identifier:num"];
+n42 -> n43
+n44 [label="SubExpression:"];
+n45 [label="Identifier:num"];
+n44 -> n45
+n46 [label="IntegerLiteral:1"];
+n44 -> n46
+n42 -> n44
+n36 -> n42
+n35 -> n36
+n31 -> n35
+n24 -> n31
+n23 -> n24
+n47 [label="Return:"];
+n48 [label="Identifier:sum"];
+n47 -> n48
+n23 -> n47
+n15 -> n23
+n14 -> n15
+n11 -> n14
+n10 -> n11
+n0 -> n10
 }

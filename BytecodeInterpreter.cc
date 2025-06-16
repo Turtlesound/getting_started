@@ -127,13 +127,15 @@ void BytecodeInterpreter::execute() {
         std::cout << std::endl;
     }
     
-    // Try to find main method in D1 class first (common convention)
-    if (classes.find("D1") != classes.end() && classes["D1"]->methods.find("main") != classes["D1"]->methods.end()) {
+    // Try to find main method in the main class first
+    if (!mainClassName.empty() && 
+        classes.find(mainClassName) != classes.end() && 
+        classes[mainClassName]->methods.find("main") != classes[mainClassName]->methods.end()) {
         if (verbose) {
-            std::cout << "Starting execution from D1.main" << std::endl;
+            std::cout << "Starting execution from " << mainClassName << ".main" << std::endl;
         }
         std::cout.flush();
-        executeMethod("D1", "main");
+        executeMethod(mainClassName, "main");
         return;
     }
     
@@ -175,8 +177,12 @@ void BytecodeInterpreter::executeMethod(const std::string& className, const std:
     if (verbose) {
         std::cout << "DEBUG: Executing method " << className << "." << methodName;
         if (objRef != -1) std::cout << " on objRef " << objRef;
-        std::cout << " with " << params.size() << " params." << std::endl;
-        std::cout.flush();
+        std::cout << " with " << params.size() << " params: ";
+        for (size_t i = 0; i < params.size(); i++) {
+            if (i > 0) std::cout << ", ";
+            std::cout << params[i];
+        }
+        std::cout << std::endl;
     }
     
     auto classIt = classes.find(className);
@@ -209,9 +215,12 @@ void BytecodeInterpreter::executeMethod(const std::string& className, const std:
     if (objRef != -1) { // If it's an instance method call with an object reference
         frame.locals[0] = objRef; // 'this'
     }
+    
+    // Ensure parameters are assigned to correct indices
     for (size_t i = 0; i < params.size(); i++) {
-        if ((i + 1) < frame.locals.size()) { // Ensure space for parameters
-            frame.locals[i + 1] = params[i];
+        int paramIndex = (objRef != -1) ? i + 1 : i; // Account for 'this' if instance method
+        if (paramIndex < frame.locals.size()) {
+            frame.locals[paramIndex] = params[i];
         } else {
             std::cerr << "Error: Not enough local variable space for parameter " << i << std::endl;
         }
@@ -572,7 +581,11 @@ void BytecodeInterpreter::executeInstruction(const std::string& instr, int& pc) 
                     if (methodIt != classIt->second->methods.end()) {
                         int targetPC = resolveLabel(labelName, methodIt->second);
                         if (targetPC >= 0) {
-                            pc = targetPC - 1;  // Subtract 1 because PC will be incremented after instruction
+                            if (verbose) {
+                                std::cout << "DEBUG: Jump to label " << labelName << " at PC " << targetPC << std::endl;
+                            }
+                            pc = targetPC;
+                            return; // Skip pc++ in executeMethod
                         }
                     }
                 }
@@ -685,30 +698,30 @@ int BytecodeInterpreter::peek() {
 }
 
 int BytecodeInterpreter::resolveLabel(const std::string& label, const std::shared_ptr<Method>& method) {
-    // Labels can be in format L1 or block_1 - handle both
+    // First try exact match
     auto labelIt = method->labels.find(label);
     if (labelIt != method->labels.end()) {
         return labelIt->second;
     }
     
-    // Try converting block_X to LX
-    if (label.substr(0, 6) == "block_") {
-        std::string altLabel = "L" + label.substr(6);
-        labelIt = method->labels.find(altLabel);
+    // Try converting block_X to LX if needed
+    std::string convertedLabel;
+    if (label.rfind("block_", 0) == 0) {
+        convertedLabel = "L" + label.substr(6);
+    }
+    // Try adding L prefix if it's just a number
+    else if (isdigit(label[0])) {
+        convertedLabel = "L" + label;
+    }
+    
+    if (!convertedLabel.empty()) {
+        labelIt = method->labels.find(convertedLabel);
         if (labelIt != method->labels.end()) {
             return labelIt->second;
         }
     }
     
-    // Try looking up Ln label
-    if (label.substr(0, 1) == "L") {
-        labelIt = method->labels.find(label);
-        if (labelIt != method->labels.end()) {
-            return labelIt->second;
-        }
-    }
-    
-    std::cerr << "Label not found: " << label << std::endl;
+    std::cerr << "Label not found: " << label << " (also tried: " << convertedLabel << ")" << std::endl;
     return -1;
 }
 

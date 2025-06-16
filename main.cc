@@ -134,7 +134,7 @@ int main(int argc, char **argv)
                     // Generate bytecode
                     std::cout << "Generating bytecode..." << std::endl;
                     BytecodeGenerator bytecodeGenerator;
-                    bytecodeGenerator.generateBytecode(cfg, "output.bytecode");
+                    bytecodeGenerator.generateBytecode(cfg, "output.bc");
                     std::cout << "Bytecode generation complete." << std::endl;
                 }
             }

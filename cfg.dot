@@ -1,7 +1,16 @@
 digraph {
   graph [ splines = ortho ]
   node [ shape = box ];
-  "E.main" [ label = " E.main \nt0 = 4 * 2\nt1 = t0 + 10\nt2 = 2 * 6\nt3 = t1 - t2\nt4 = 4 - 1\nt5 = t4 * 2\nt6 = t5 * 2\nt7 = t3 + t6\nparam t7\n = call System.out.println\nt8 = ! true\nt9 = t8 && false\nt10 = true == t9\nt11 = 10 > 1\nt12 = 1 < 10\nt13 = t11 && t12\nt14 = t10 || t13\nparam t14\n = call System.out.println\n " ];
+  "D1.main" [ label = " D1.main \nt0 = call new Sum\nparam 100\nt0 = call t0.calcSum\nparam t0\n = call System.out.println\n " ];
+  "Sum.calcSum" [ label = " Sum.calcSum \nsum = 0\ngoto block_2\n " ];
+  "block_2" [ label = " block_2 \nt1 = 0 < num\nif t1 goto block_3\niffalse t1 goto block_4\n " ];
+  "block_3" [ label = " block_3 \nt2 = sum + num\nsum = t2\nt3 = num - 1\nnum = t3\ngoto block_2\n " ];
+  "block_4" [ label = " block_4 \nreturn sum\n " ];
+  "D1.main" -> "Sum.calcSum" [ style = dashed, color = blue, label = "call" ];
+  "Sum.calcSum" -> "block_2";
+  "block_2" -> "block_3" [ xlabel = " true " ];
+  "block_2" -> "block_4" [ xlabel = " false " ];
+  "block_3" -> "block_2";
   entry [shape=oval, label="entry"];
-  entry -> "E.main";
+  entry -> "D1.main";
 }
