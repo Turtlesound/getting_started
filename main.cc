@@ -2,7 +2,8 @@
 #include "parser.tab.hh"
 #include "SymbolTable.h"
 #include "SemanticAnalyzer.h"
-#include "IRGenerator.h"  // Add this include
+#include "IRGenerator.h"  
+#include "BytecodeGenerator.h"
 
 extern Node *root;
 extern FILE *yyin;
@@ -45,10 +46,7 @@ void debugPrintAST(Node* node, int depth = 0) {
     // Print node info
     std::cout << node->type << ": " << node->value << " (line: " << node->lineno << ")" << std::endl;
     
-    // Recursively print children
-    //for (auto child : node->children) {
-    //    debugPrintAST(child, depth + 1);
-    //}
+
 }
 
 void printNodeTypeHierarchy(Node* node, int depth = 0) {
@@ -93,6 +91,11 @@ int main(int argc, char **argv)
 
         if (parseSuccess && !lexical_errors) {
             try {
+				                // Generate parse tree visualization
+                if (root)
+                {
+                    root->generate_tree();
+                }
                 // Build symbol table first without reporting errors
                 SymbolTable symbolTable;
                 symbolTable.buildFromAST(root);
@@ -127,6 +130,12 @@ int main(int argc, char **argv)
                     // Generate CFG visualization
                     cfg.generateDotFile("cfg.dot");
                     std::cout << "Generated control flow graph in cfg.dot" << std::endl;
+
+                    // Generate bytecode
+                    std::cout << "Generating bytecode..." << std::endl;
+                    BytecodeGenerator bytecodeGenerator;
+                    bytecodeGenerator.generateBytecode(cfg, "output.bytecode");
+                    std::cout << "Bytecode generation complete." << std::endl;
                 }
             }
             catch (const std::exception& e) {

@@ -100,9 +100,9 @@ void SemanticAnalyzer::checkClassDeclaration(Node* node) {
     
     std::string className = node->children.front()->value;
     
-    // Simplify the duplicate check with direct map lookup
+    // duplicate check with direct map lookup
     if (classLines.count(className) > 0) {
-        // We found a duplicate class
+        
         addError("Already Declared Class: '" + className + "'", node->lineno);
     } else {
         classLines[className] = node->lineno;
@@ -128,7 +128,7 @@ void SemanticAnalyzer::checkMethodDeclaration(Node* node) {
     
     auto it = node->children.begin();
     if ((*it)->type == "Public") ++it;
-    ++it; // Skip return type
+    ++it; 
     
     std::string methodName = (*it)->value;
     std::string key = currentClass + "." + methodName;
@@ -188,9 +188,9 @@ void SemanticAnalyzer::checkLocalVarDeclaration(Node* node) {
     std::string localKey = methodKey + "." + varName;
     
     // Check if this is a true duplicate (previously declared in the same scope)
-    // or if it was used before declaration (which should be handled in checkAssignment)
+    // if it was used before declaration (should be handled in checkAssignment)
     if (localLines.find(localKey) != localLines.end()) {
-        // If we already recorded this variable and the current line is not
+        //  already recorded this variable and the current line is not
         // the same as the recorded line, then it's a duplicate declaration
         if (localLines[localKey] != node->lineno) {
             addError("Already Declared variable: '" + varName + "'", node->lineno);
@@ -229,7 +229,7 @@ bool SemanticAnalyzer::areTypesCompatible(const std::string& expectedType, const
     return false;
 }
 
-// Add this helper function
+
 std::string SemanticAnalyzer::getExpressionName(Node* node) {
     if (!node) return "unknown";
     
@@ -253,7 +253,7 @@ std::string SemanticAnalyzer::getExpressionName(Node* node) {
     return "expression";
 }
 
-// Update getExpressionType to provide better error messages for undefined methods
+
 std::string SemanticAnalyzer::getExpressionType(Node* node) {
     if (!node) return "";
 
@@ -267,7 +267,7 @@ std::string SemanticAnalyzer::getExpressionType(Node* node) {
     else if (node->type == "StringLiteral") {
         return "String";
     }
-    else if (node->type == "This") {  // Add this case to handle 'this' keyword
+    else if (node->type == "This") {  
         return currentClass;
     }
     else if (node->type == "ThisExpression") {
@@ -389,7 +389,7 @@ std::string SemanticAnalyzer::getExpressionType(Node* node) {
         
         // If it's an array type, return the element type
         if (isArrayType(arrayType)) {
-            return arrayType.substr(0, arrayType.length() - 2); // Remove the []
+            return arrayType.substr(0, arrayType.length() - 2); 
         } else {
             addError("array access on non-array type '" + arrayType + "'", node->lineno);
             return "";
@@ -551,7 +551,7 @@ void SemanticAnalyzer::checkMethodCall(Node* node) {
     auto methodRecord = std::dynamic_pointer_cast<MethodRecord>(methodIt->second);
     if (!methodRecord) return;
     
-    // FIX: Use paramOrder.size() instead of params.size() to correctly count parameters
+    
     size_t expectedParamCount = methodRecord->paramOrder.size();
     size_t actualArgCount = 0;
     std::vector<Node*> argNodes;
@@ -712,7 +712,7 @@ void SemanticAnalyzer::checkReturnType(Node* node) {
     // Get the current method's key
     std::string key = currentClass + "." + currentMethod;
     
-    // ADDED: Skip return type validation for duplicate methods
+  
     // Check if this method was already reported as a duplicate
     if (isDuplicateMethod(currentClass, currentMethod)) {
         return;
@@ -767,10 +767,7 @@ void SemanticAnalyzer::checkConditions(Node* node) {
 }
 
 void SemanticAnalyzer::addError(const std::string& message, int lineNo) {
-    // Change from the current format:
-    // std::string error = "Line " + std::to_string(lineNo) + ": semantic (" + message + ")";
-    
-    // To the format expected by testScript.py:
+
     std::string error = "@error at line " + std::to_string(lineNo) + ". " + message;
     
     // Only add if this exact error isn't already in the list
@@ -818,7 +815,7 @@ void SemanticAnalyzer::checkArrayAssignment(Node* node) {
     }
 }
 
-// NEW helper function to check if a method is a duplicate
+
 bool SemanticAnalyzer::isDuplicateMethod(const std::string& className, const std::string& methodName) const {
     // Check if we've already reported this method as a duplicate
     std::string key = className + "." + methodName;

@@ -14,7 +14,7 @@ class Instruction;
 class BasicBlock;
 class CFG;
 
-// Represents a three-address instruction
+//  three-address instruction
 class Instruction {
 public:
     enum OpType {
@@ -95,6 +95,9 @@ public:
     std::vector<BasicBlock*> successors;
     std::vector<BasicBlock*> predecessors;
     
+    // map for method call targets
+    std::map<std::string, BasicBlock*> callTargets;
+    
     explicit BasicBlock(const std::string& lbl, int id) : label(lbl), blockId(id) {}
     
     void addInstruction(const Instruction& instr) {
@@ -132,7 +135,7 @@ public:
     CFG(const CFG&) = delete;
     CFG& operator=(const CFG&) = delete;
     
-    // Add move constructor and move assignment
+    // move constructor and move assignment
     CFG(CFG&& other) noexcept 
         : blocks(std::move(other.blocks)), 
           entry(other.entry), 
@@ -162,7 +165,7 @@ public:
         blocks.push_back(std::make_unique<BasicBlock>(label, blockId));
         BasicBlock* block = blocks.back().get();
         
-        // If this is the first block, set it as entry
+        // If first block, set as entry
         if (!entry) entry = block;
         
         return block;
@@ -172,57 +175,7 @@ public:
         return "t" + std::to_string(tempCounter++);
     }
     
-    void generateDotFile(const std::string& filename) const {
-        std::ofstream outFile(filename);
-        if (!outFile.is_open()) {
-            std::cerr << "Error: Could not open file " << filename << " for writing." << std::endl;
-            return;
-        }
-        
-        outFile << "digraph {" << std::endl;
-        outFile << "  graph [ splines = ortho ]" << std::endl;
-        outFile << "  node [ shape = box ];" << std::endl;
-        
-        // Generate nodes for basic blocks
-        for (const auto& block : blocks) {
-            outFile << "  " << block->label << " [ label = \" " << block->label << " \\n" 
-                    << block->toString() << " \" ];" << std::endl;
-        }
-        
-        // Generate edges between blocks with condition labels
-        for (const auto& block : blocks) {
-            for (const auto& succ : block->successors) {
-                bool hasLabel = false;
-                std::string edgeLabel;
-                
-                // Check if this is a conditional edge
-                for (const auto& instr : block->instructions) {
-                    if (instr.type == Instruction::IF_TRUE && instr.result == succ->label) {
-                        hasLabel = true;
-                        edgeLabel = "true";
-                        break;
-                    } 
-                    else if (instr.type == Instruction::IF_FALSE && instr.result == succ->label) {
-                        hasLabel = true;
-                        edgeLabel = "false";
-                        break;
-                    }
-                }
-                
-                if (hasLabel) {
-                    outFile << "  " << block->label << " -> " << succ->label 
-                            << " [ xlabel = \" " << edgeLabel << " \" ];" << std::endl;
-                } else {
-                    outFile << "  " << block->label << " -> " << succ->label << ";" << std::endl;
-                }
-            }
-        }
-        
-        outFile << "}" << std::endl;
-        outFile.close();
-        
-        std::cout << "CFG visualization generated at " << filename << std::endl;
-    }
+    void generateDotFile(const std::string& filename) const;
 };
 
 #endif // IR_H

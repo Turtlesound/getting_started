@@ -33,12 +33,20 @@ public:
     std::string getKind() const override;
     std::vector<std::pair<std::string, std::string>> getAllFields() const;
     std::vector<std::pair<std::string, std::string>> getAllMethods() const;
+
+    std::vector<std::string> getMethodNames() const {
+        std::vector<std::string> names;
+        for (const auto& entry : methods) {
+            names.push_back(entry.first);
+        }
+        return names;
+    }
 };
 
 // Method record
 class MethodRecord : public Record {
 public:
-    // Add this vector to track parameter order
+    // track parameter order
     std::vector<std::string> paramOrder;
     std::string returnType;
     std::map<std::string, std::shared_ptr<Record>> params;
@@ -96,6 +104,15 @@ public:
                          const std::string& paramName) const;
     bool isDuplicateLocal(const std::string& className, const std::string& methodName,
                          const std::string& localName) const;
+
+    //method to get class names
+    std::vector<std::string> getClassNames() const {
+        std::vector<std::string> names;
+        for (const auto& entry : classes) {
+            names.push_back(entry.first);
+        }
+        return names;
+    }
                          
     // Helper methods for debugging/visualization
     void generateDotFile(const std::string& filename = "symboltable.dot") const;

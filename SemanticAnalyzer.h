@@ -31,7 +31,7 @@ private:
     // Set to track processed nodes to avoid duplicates
     std::set<Node*> processedNodes;
     
-    // Add this member variable to track duplicate methods
+    //  member variable to track duplicate methods
     std::set<std::string> duplicateMethods;
     
     // Helper methods for type checking

@@ -191,15 +191,12 @@ void SymbolTable::addVariable(const std::string& name, const std::string& type, 
             return;
         }
         if (isParam) {
-            // Always add the parameter name to paramOrder to reflect the declared arity.
-            // The semantic analyzer will handle reporting duplicate parameter names separately.
+
             methodRecord->paramOrder.push_back(name);
 
             if (methodRecord->params.find(name) != methodRecord->params.end()) {
                 // This is a duplicate parameter name.
-                // The semantic analyzer (e.g., checkParameterDeclaration) is responsible for reporting this error.
-                // We've already added it to paramOrder for arity checking.
-                // We don't add it to the 'params' map again, as the map stores unique names (the first one wins).
+
                 return; 
             }
             methodRecord->params[name] = varRecord;

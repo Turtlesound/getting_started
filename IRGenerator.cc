@@ -3,149 +3,296 @@
 #include <cassert>
 
 CFG IRGenerator::generate(Node* root) {
-    // Reset the CFG
+    // Reset state
     cfg = CFG();
+    methodEntryPoints.clear();
+    currentClass = "";
+    currentMethod = "";
     
-    // Create entry block
-    BasicBlock* programEntry = cfg.createBlock();
-    currentBlock = programEntry;
-    
-    // Process the AST
-    if (root) {
-        std::cout << "Starting AST traversal from root node: " << root->type << std::endl;
-        traverseAST(root);
-    } else {
+    if (!root) {
         std::cerr << "AST root is null!" << std::endl;
+        return std::move(cfg);
     }
+
+    // PASS 1: Collect all method entries first
+    std::cout << "Pass 1: Collecting method entries..." << std::endl;
+    collectMethodEntries(root);
+    
+    // Debug - print all found method entries
+    std::cout << "Found " << methodEntryPoints.size() << " method entries:" << std::endl;
+    for (const auto& entry : methodEntryPoints) {
+        std::cout << "  " << entry.first << " -> block " << entry.second->label << std::endl;
+    }
+    
+    // PASS 2: Generate IR for method bodies with knowledge of all methods
+    std::cout << "Pass 2: Generating method bodies..." << std::endl;
+    generateMethodBodies(root);
     
     std::cout << "Created " << cfg.blocks.size() << " blocks in CFG" << std::endl;
     return std::move(cfg);
 }
 
-void IRGenerator::traverseAST(Node* node) {
+// New method to collect all method entries in the first pass
+void IRGenerator::collectMethodEntries(Node* node) {
     if (!node) return;
     
-    std::cout << "Processing node: " << node->type << std::endl;
-    
-    // Handle different node types
     if (node->type == "Goal") {
         for (auto child : node->children) {
-            traverseAST(child);
+            collectMethodEntries(child);
         }
     }
     else if (node->type == "MainClass") {
         std::string className = node->children.front()->value;
-        currentClass = className;
-        std::cout << "Processing main class: " << className << std::endl;
+        std::string mainMethodName = className + ".main";
         
-        // Process other children to find statements
-        for (auto child : node->children) {
-            if (child->type == "PrintStatement" || 
-                child->type == "Statement" || 
-                child->type == "StatementList" ||
-                child->type == "WhileStatement" ||  // Added for loop handling
-                child->type == "IfStatement" ||     // Added for if handling
-                child->type == "IfElseStatement") { // Added for if-else handling
-                processStatement(child);
-            } else {
-                traverseAST(child);
-            }
-        }
-        currentClass = "";
+        // Create entry block for main method
+        BasicBlock* mainBlock = cfg.createBlock();
+        mainBlock->label = mainMethodName;
+        methodEntryPoints[mainMethodName] = mainBlock;
+        
+        if (!cfg.entry) cfg.entry = mainBlock; // Set as entry if not already set
+        
+        std::cout << "  Registered main method: " << mainMethodName << std::endl;
     }
     else if (node->type == "ClassDeclaration") {
         std::string className = node->children.front()->value;
+        std::string prevClass = currentClass;
         currentClass = className;
-        std::cout << "Processing class: " << className << std::endl;
         
-        // Find method declarations
+        // Find method declarations and create entry blocks for them
         for (auto child : node->children) {
             if (child->type == "MethodDeclarationList") {
                 for (auto methodDecl : child->children) {
                     if (methodDecl->type == "MethodDeclaration") {
-                        processMethodDeclaration(methodDecl);
-                    }
-                }
-            }
-        }
-        currentClass = "";
-    }
-    else if (node->type == "ClassDeclarationList") {
-        // Process all class declarations
-        for (auto child : node->children) {
-            traverseAST(child);
-        }
-    }
-    else {
-        // Continue traversing for other node types
-        for (auto child : node->children) {
-            traverseAST(child);
-        }
-    }
-}
-
-void IRGenerator::processMethodDeclaration(Node* node) {
-    if (!node) return;
-    
-    // Extract method name and parameters
-    std::string methodName;
-    for (auto child : node->children) {
-        if (child->type == "Identifier") {
-            methodName = child->value;
-            break;
-        }
-    }
-    
-    currentMethod = methodName;
-    std::cout << "Processing method: " << currentMethod << std::endl;
-    
-    // Create entry block for this method
-    BasicBlock* methodEntry = cfg.createBlock();
-    methodEntry->label = "block_" + std::to_string(methodEntry->blockId);
-    
-    // If there's an existing block, link to the method entry
-    if (currentBlock && currentBlock != methodEntry) {
-        currentBlock->addInstruction(Instruction(Instruction::GOTO, methodEntry->label));
-        currentBlock->addSuccessor(methodEntry);
-    }
-    
-    currentBlock = methodEntry;
-    
-    // Process parameters
-    for (auto child : node->children) {
-        if (child->type == "ParameterList") {
-            for (auto param : child->children) {
-                if (param->type == "Parameter") {
-                    // Find parameter identifier
-                    for (auto paramChild : param->children) {
-                        if (paramChild->type == "Identifier") {
-                            currentBlock->addInstruction(Instruction(Instruction::PARAM, paramChild->value));
+                        // Extract method name
+                        std::string methodName = "";
+                        for (auto methodChild : methodDecl->children) {
+                            if (methodChild->type == "Identifier") {
+                                methodName = methodChild->value;
+                                break;
+                            }
+                        }
+                        
+                        if (!methodName.empty()) {
+                            std::string fullMethodName = currentClass + "." + methodName;
+                            BasicBlock* methodBlock = cfg.createBlock();
+                            methodBlock->label = fullMethodName;
+                            methodEntryPoints[fullMethodName] = methodBlock;
+                            
+                            std::cout << "  Registered method: " << fullMethodName << std::endl;
                         }
                     }
                 }
             }
         }
+        
+        currentClass = prevClass;
     }
+    else if (node->type == "ClassDeclarationList") {
+        for (auto child : node->children) {
+            collectMethodEntries(child);
+        }
+    }
+}
+
+//  generate IR for method bodies in the second pass
+void IRGenerator::generateMethodBodies(Node* node) {
+    if (!node) return;
     
-    // Process method body
-    for (auto child : node->children) {
-        if (child->type == "MethodBody") {
-            // Process statements in method body
-            for (auto bodyChild : child->children) {
-                if (bodyChild->type == "StatementList") {
-                    for (auto stmt : bodyChild->children) {
-                        processStatement(stmt);
-                    }
+    if (node->type == "Goal") {
+        for (auto child : node->children) {
+            generateMethodBodies(child);
+        }
+    }
+    else if (node->type == "MainClass") {
+        std::string className = node->children.front()->value;
+        std::string mainMethodName = className + ".main";
+        
+        // Find the entry block for the main method
+        auto mainIt = methodEntryPoints.find(mainMethodName);
+        if (mainIt != methodEntryPoints.end()) {
+            currentClass = className;
+            currentMethod = "main";
+            currentBlock = mainIt->second;
+            
+            // Process main method body
+            for (auto child : node->children) {
+                if (child->type == "Block" || child->type == "StatementList") {
+                    processBlock(child);
+                } else if (child->type == "PrintStatement") {
+                    processPrintStatement(child);
                 }
-                // Process return statement
-                if (bodyChild->type == "Return") {
-                    processReturn(bodyChild);
+            }
+            
+            currentClass = "";
+            currentMethod = "";
+        }
+    }
+    else if (node->type == "ClassDeclaration") {
+        std::string className = node->children.front()->value;
+        std::string prevClass = currentClass;
+        currentClass = className;
+        
+        // Find and process method bodies
+        for (auto child : node->children) {
+            if (child->type == "MethodDeclarationList") {
+                for (auto methodDecl : child->children) {
+                    if (methodDecl->type == "MethodDeclaration") {
+                        std::string methodName = "";
+                        std::string returnType = "";
+                        
+                        // Extract method name and return type
+                        for (auto methodChild : methodDecl->children) {
+                            if (methodChild->type == "Identifier") {
+                                methodName = methodChild->value;
+                            } else if (methodChild->type == "Type" || methodChild->type == "Int" || 
+                                     methodChild->type == "Boolean" || methodChild->type == "IntArray") {
+                                returnType = methodChild->value;
+                            }
+                        }
+                        
+                        if (!methodName.empty()) {
+                            std::string fullMethodName = currentClass + "." + methodName;
+                            
+                            // Get the method's entry block
+                            auto methodIt = methodEntryPoints.find(fullMethodName);
+                            if (methodIt != methodEntryPoints.end()) {
+                                std::string prevMethod = currentMethod;
+                                currentMethod = methodName;
+                                currentBlock = methodIt->second;
+                                
+                                // Process method body
+                                for (auto bodyChild : methodDecl->children) {
+                                    if (bodyChild->type == "MethodBody" || bodyChild->type == "Block") {
+                                        processMethodBody(bodyChild);
+                                    } else if (bodyChild->type == "Return") {
+                                        processReturn(bodyChild);
+                                    }
+                                }
+                                
+                                
+                                bool hasReturn = false;
+                                for (const auto& instr : currentBlock->instructions) {
+                                    if (instr.type == Instruction::RETURN) {
+                                        hasReturn = true;
+                                        break;
+                                    }
+                                }
+                                
+                                if (!hasReturn) {
+                                    if (returnType == "int") {
+                                        currentBlock->addInstruction(Instruction(Instruction::RETURN, "0"));
+                                    } else if (returnType == "boolean") {
+                                        currentBlock->addInstruction(Instruction(Instruction::RETURN, "false"));
+                                    } else {
+                                        currentBlock->addInstruction(Instruction(Instruction::RETURN, "null"));
+                                    }
+                                }
+                                
+                                currentMethod = prevMethod;
+                            }
+                        }
+                    }
                 }
             }
         }
+        
+        currentClass = prevClass;
+    }
+    else if (node->type == "ClassDeclarationList") {
+        for (auto child : node->children) {
+            generateMethodBodies(child);
+        }
+    }
+}
+
+// Helper method to find nodes of a specific type within a subtree
+std::vector<Node*> IRGenerator::findNodesOfType(Node* root, const std::string& type) {
+    std::vector<Node*> result;
+    if (!root) return result;
+    
+    if (root->type == type) {
+        result.push_back(root);
     }
     
-    currentMethod = "";
+    for (auto child : root->children) {
+        auto childResults = findNodesOfType(child, type);
+        result.insert(result.end(), childResults.begin(), childResults.end());
+    }
+    
+    return result;
+}
+
+// helper method to generate proper method labels
+std::string IRGenerator::getMethodFullName(const std::string& className, const std::string& methodName) {
+    return className + "." + methodName;
+}
+
+void IRGenerator::processMethodDeclaration(Node* node) {
+    if (node->children.size() < 4) return;
+    
+    // Find method attributes
+    std::string methodName = "";
+    std::string returnType = "";
+    
+    for (auto child : node->children) {
+        if (child->type == "Identifier") {
+            methodName = child->value;
+        } else if (child->type == "Type" || child->type == "Int" || 
+                   child->type == "Boolean" || child->type == "IntArray") {
+            returnType = child->value;
+        }
+    }
+    
+    if (methodName.empty()) return;
+    
+    // method name
+    std::string fullMethodName = currentClass + "." + methodName;
+    
+    // Create a new block for this method 
+    BasicBlock* methodEntry = cfg.createBlock();
+    methodEntry->label = fullMethodName;
+    
+    // Store method entry point
+    methodEntryPoints[fullMethodName] = methodEntry;
+    currentBlock = methodEntry;
+    
+    std::cout << "Processing method: " << fullMethodName << std::endl;
+    
+    // Save current method context
+    std::string prevMethod = currentMethod;
+    currentMethod = methodName;
+    
+    // Process method body
+    for (auto child : node->children) {
+        if (child->type == "MethodBody" || child->type == "Block") {
+            processMethodBody(child);
+        } else if (child->type == "Return") {
+            processReturn(child);
+        }
+    }
+    
+    
+    bool hasReturn = false;
+    for (const auto& instr : currentBlock->instructions) {
+        if (instr.type == Instruction::RETURN) {
+            hasReturn = true;
+            break;
+        }
+    }
+    
+    if (!hasReturn) {
+        if (returnType == "int") {
+            currentBlock->addInstruction(Instruction(Instruction::RETURN, "0"));
+        } else if (returnType == "boolean") {
+            currentBlock->addInstruction(Instruction(Instruction::RETURN, "false"));
+        } else {
+            currentBlock->addInstruction(Instruction(Instruction::RETURN, "null"));
+        }
+    }
+    
+    // Restore previous method context
+    currentMethod = prevMethod;
 }
 
 std::string IRGenerator::processExpression(Node* node) {
@@ -234,9 +381,6 @@ void IRGenerator::processStatement(Node* node) {
         processExpression(node);
     }
 }
-
-// Keep the existing methods for processIntegerLiteral, etc.
-// ...
 
 void IRGenerator::processIfStatement(Node* node) {
     if (!node || node->children.size() < 2) {
@@ -360,8 +504,6 @@ void IRGenerator::processMethodBody(Node* node) {
     }
 }
 
-// Add these implementations to the end of the file:
-
 std::string IRGenerator::processIntegerLiteral(Node* node) {
     return node->value; // Just return the literal value
 }
@@ -457,41 +599,86 @@ std::string IRGenerator::processArrayLength(Node* node) {
     return temp;
 }
 
+
 std::string IRGenerator::processMethodCall(Node* node) {
+    std::string result_temp_name = newTemp();
+    
     if (node->children.size() < 2) {
-        std::cerr << "Invalid method call: missing object or method name" << std::endl;
-        return "";
+        std::cerr << "[DEBUG IRGen] Invalid method call structure. Node type: " << node->type << std::endl;
+        return result_temp_name;
     }
     
     auto it = node->children.begin();
-    auto objExpr = *it;
-    auto methodNameNode = *(++it);
+    Node* objAstNode = *it;
+    ++it;
+    Node* methodIdentifierNode = *it;
     
-    std::string obj = processExpression(objExpr);
-    std::string methodName = methodNameNode->value;
-    
-    // Process arguments if present
-    std::vector<std::string> args;
+    std::string objRefIr = processExpression(objAstNode);
+    std::string methodName = methodIdentifierNode->value;
+
+    std::cerr << "[DEBUG IRGen] processMethodCall: objRefIr = " << objRefIr 
+              << ", methodName = " << methodName 
+              << ", objAstNode->type = " << objAstNode->type << std::endl;
+    if (currentBlock) {
+        std::cerr << "[DEBUG IRGen] Called from block: " << currentBlock->label << std::endl;
+    }
+
+    // Process parameters if any
     if (node->children.size() > 2) {
-        auto argListIt = ++(++it);
-        if (argListIt != node->children.end()) {
-            auto argList = *argListIt;
-            for (auto argExpr : argList->children) {
-                args.push_back(processExpression(argExpr));
-            }
+        ++it; 
+        Node* argList = *it;
+        for (auto argNode : argList->children) {
+            std::string paramValueIr = processExpression(argNode);
+            currentBlock->addInstruction(Instruction(Instruction::PARAM, paramValueIr));
         }
     }
+
+    std::string calleeNameForInstruction = objRefIr + "." + methodName;
+    currentBlock->addInstruction(Instruction(Instruction::CALL, result_temp_name, calleeNameForInstruction));
     
-    // Generate param instructions
-    for (const auto& arg : args) {
-        currentBlock->addInstruction(Instruction(Instruction::PARAM, arg));
+    std::string targetMethodFullName;
+
+    if (objAstNode->type == "ThisExpression" || objAstNode->type == "This") {
+        targetMethodFullName = currentClass + "." + methodName;
+        std::cerr << "[DEBUG IRGen] 'this' call: currentClass = " << currentClass << ", targetMethodFullName = " << targetMethodFullName << std::endl;
+    } else if (objAstNode->type == "NewObject") {
+        if (!objAstNode->children.empty() && objAstNode->children.front()->type == "Identifier") {
+            std::string classNameOfNewObj = objAstNode->children.front()->value;
+            targetMethodFullName = classNameOfNewObj + "." + methodName;
+            std::cerr << "[DEBUG IRGen] 'new' call: classNameOfNewObj = " << classNameOfNewObj << ", targetMethodFullName = " << targetMethodFullName << std::endl;
+        } else {
+            std::cerr << "[DEBUG IRGen] Warning: NewObject AST node has unexpected structure. Children count: " << objAstNode->children.size() << std::endl;
+            if (!objAstNode->children.empty()) {
+                 std::cerr << "[DEBUG IRGen] NewObject child type: " << objAstNode->children.front()->type << std::endl;
+            }
+        }
+    } else if (objAstNode->type == "Identifier") {
+        std::cerr << "[DEBUG IRGen] Call on identifier '" << objAstNode->value << "'. Type: " << objAstNode->type << ". Complex case, requires type lookup." << std::endl;
+        
+    } else {
+        std::cerr << "[DEBUG IRGen] Unhandled objAstNode->type for method call: " << objAstNode->type << std::endl;
+    }
+
+    if (!targetMethodFullName.empty()) {
+        std::cerr << "[DEBUG IRGen] Attempting to find method entry point for: " << targetMethodFullName << std::endl;
+
+
+        auto targetIt = methodEntryPoints.find(targetMethodFullName);
+        if (targetIt != methodEntryPoints.end()) {
+            currentBlock->callTargets[targetMethodFullName] = targetIt->second;
+            std::cerr << "[DEBUG IRGen] Found method entry point. Added to callTargets for block " << currentBlock->label << " -> " << targetIt->second->label << std::endl;
+        } else {
+            std::cerr << "[DEBUG IRGen] Warning: Could not find method entry point for call to " << targetMethodFullName 
+                      << " from block " << (currentBlock ? currentBlock->label : "unknown_block") 
+                      << " (AST obj type: " << objAstNode->type << ", IR obj ref: " << objRefIr << ")" << std::endl;
+        }
+    } else {
+        std::cerr << "[DEBUG IRGen] Warning: targetMethodFullName is empty for call " << calleeNameForInstruction
+                  << " (AST obj type: " << objAstNode->type << ")"
+                  << " from block " << (currentBlock ? currentBlock->label : "unknown_block") << std::endl;
     }
     
-    // Generate call instruction
-    std::string temp = cfg.newTemp();
-    currentBlock->addInstruction(Instruction(Instruction::CALL, temp, obj + "." + methodName));
-    
-    return temp;
+    return result_temp_name;
 }
 
 std::string IRGenerator::processNewObject(Node* node) {
@@ -581,8 +768,24 @@ void IRGenerator::processReturn(Node* node) {
 }
 
 void IRGenerator::processBlock(Node* node) {
+    if (!node || node->children.empty()) return;
+    
+    std::cout << "Processing block with " << node->children.size() << " children" << std::endl;
+    
+    // Process each statement in the block
     for (auto child : node->children) {
-        processStatement(child);
+        if (child->type == "PrintStatement") {
+            processPrintStatement(child);
+        } 
+        else if (child->type == "StatementList") {
+            // Process each statement in the statement list
+            for (auto stmt : child->children) {
+                processStatement(stmt);
+            }
+        }
+        else {
+            processStatement(child);
+        }
     }
 }
 
@@ -593,10 +796,91 @@ void IRGenerator::processPrintStatement(Node* node) {
         return;
     }
     
+    std::cout << "Processing print statement with " << node->children.size() << " children" << std::endl;
+    
+    // Make sure we have a current block
+    if (!currentBlock) {
+        currentBlock = cfg.createBlock();
+    }
+    
     auto expr = node->children.front();
     std::string result = processExpression(expr);
+    
+    std::cout << "Print expression result: " << result << std::endl;
     
     // Generate a call to System.out.println
     currentBlock->addInstruction(Instruction(Instruction::PARAM, result));
     currentBlock->addInstruction(Instruction(Instruction::CALL, "", "System.out.println"));
+}
+
+//CFG.generateDotFile method to show method call relationships
+void CFG::generateDotFile(const std::string& filename) const {
+    std::ofstream outFile(filename);
+    if (!outFile.is_open()) {
+        std::cerr << "Error opening file: " << filename << std::endl;
+        return;
+    }
+    
+    outFile << "digraph {" << std::endl;
+    outFile << "  graph [ splines = ortho ]" << std::endl;
+    outFile << "  node [ shape = box ];" << std::endl;
+    
+    // Generate nodes for basic blocks
+    for (const auto& block : blocks) {
+        // Skip empty blocks
+        if (block->instructions.empty()) continue;
+        
+        outFile << "  \"" << block->label << "\" [ label = \" " << block->label << " \\n" 
+                << block->toString() << " \" ];" << std::endl;
+    }
+    
+    // Generate edges between blocks with condition labels
+    for (const auto& block : blocks) {
+        // Skip empty blocks
+        if (block->instructions.empty()) continue;
+        
+        // Regular control flow edges
+        for (const auto& succ : block->successors) {
+            bool hasLabel = false;
+            std::string edgeLabel;
+            
+            // Check if this is a conditional edge
+            for (const auto& instr : block->instructions) {
+                if (instr.type == Instruction::IF_TRUE && instr.result == succ->label) {
+                    hasLabel = true;
+                    edgeLabel = "true";
+                    break;
+                } 
+                else if (instr.type == Instruction::IF_FALSE && instr.result == succ->label) {
+                    hasLabel = true;
+                    edgeLabel = "false";
+                    break;
+                }
+            }
+            
+            // Draw edges with appropriate labels
+            if (hasLabel) {
+                outFile << "  \"" << block->label << "\" -> \"" << succ->label 
+                        << "\" [ xlabel = \" " << edgeLabel << " \" ];" << std::endl;
+            } else {
+                outFile << "  \"" << block->label << "\" -> \"" << succ->label << "\";" << std::endl;
+            }
+        }
+        
+        // Method call edges (dashed lines to show calls)
+        for (const auto& callTarget : block->callTargets) {
+            outFile << "  \"" << block->label << "\" -> \"" << callTarget.second->label 
+                    << "\" [ style = dashed, color = blue, label = \"call\" ];" << std::endl;
+        }
+    }
+    
+    outFile << "  entry [shape=oval, label=\"entry\"];" << std::endl;
+if (entry) {
+    outFile << "  entry -> \"" << entry->label << "\";" << std::endl;
+}
+    
+    outFile << "}" << std::endl;
+    outFile.close();
+    
+    std::cout << "CFG visualization generated at " << filename << std::endl;
 }
