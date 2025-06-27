@@ -1,3 +1,10 @@
 digraph SymbolTable {
   node [shape=record];
+  FacFib [label="{Class: FacFib|{Fields|none}|{Methods|Compute: int\lComputeFac: int\lComputeFib: int}}"];
+  FacFib_Compute [label="{Method: Compute|Return Type: int|{Parameters|first: int\lsecond: int}|{Locals|fac: int\lfib: int\lreturnValue: int}}"];
+  FacFib -> FacFib_Compute;
+  FacFib_ComputeFac [label="{Method: ComputeFac|Return Type: int|{Parameters|num: int}|{Locals|fac: int}}"];
+  FacFib -> FacFib_ComputeFac;
+  FacFib_ComputeFib [label="{Method: ComputeFib|Return Type: int|{Parameters|num: int}|{Locals|f0: int\lf1: int\lfib: int\li: int}}"];
+  FacFib -> FacFib_ComputeFib;
 }

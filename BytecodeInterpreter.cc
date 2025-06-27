@@ -516,10 +516,6 @@ void BytecodeInterpreter::executeInvokeVirtual(const std::string& methodName) {
     record.methodName = fullMethodName;
     record.returnAddress = programCounter + 1; // Return to next instruction
     
-    // Generic parameter handling - determine number of parameters from method signature
-    // For now, we'll handle single-parameter methods (which covers our test cases)
-    // This could be enhanced to parse the full method signature for multiple parameters
-    
     // Check if method has parameters (indicated by presence of '(' and something before ')')
     bool hasParameters = false;
     if (methodInfo.signature.length() > 2) { // More than just "()"

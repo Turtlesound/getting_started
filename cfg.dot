@@ -1,7 +1,35 @@
 digraph {
   graph [ splines = ortho ];
   node [ shape = box ];
-  "E.main" [ label = " E.main \nt0 = 4 * 2\nt1 = t0 + 10\nt2 = 2 * 6\nt3 = t1 - t2\nt4 = 4 - 1\nt5 = t4 * 2\nt6 = t5 * 2\nt7 = t3 + t6\nparam t7\n = call System.out.println\nt8 = ! true\nt9 = t8 && false\nt10 = true == t9\nt11 = 10 > 1\nt12 = 1 < 10\nt13 = t11 && t12\nt14 = t10 || t13\nparam t14\n = call System.out.println\n " ];
+  "B.main" [ label = " B.main \nt1 = call new FacFib\nparam 5\nparam 10\nt0 = call t1.Compute\nparam t0\n = call System.out.println\n " ];
+  "FacFib.Compute" [ label = " FacFib.Compute \nt2 = first < 1\nt3 = ! t2\nt4 = second < 1\nt5 = ! t4\nt6 = t3 && t5\nif t6 goto block_4\niffalse t6 goto block_6\n " ];
+  "FacFib.ComputeFac" [ label = " FacFib.ComputeFac \nt9 = num < 1\nif t9 goto block_7\niffalse t9 goto block_9\n " ];
+  "FacFib.ComputeFib" [ label = " FacFib.ComputeFib \nf0 = 0\nf1 = 1\nfib = num\ni = 1\ngoto block_10\n " ];
+  "block_4" [ label = " block_4 \nparam first\nt7 = call this.ComputeFac\nfac = t7\nparam fac\n = call System.out.println\nparam second\nt8 = call this.ComputeFib\nfib = t8\nparam fib\n = call System.out.println\nreturnValue = 1\ngoto block_5\n " ];
+  "block_5" [ label = " block_5 \nreturn returnValue\n " ];
+  "block_6" [ label = " block_6 \nreturnValue = 0\ngoto block_5\n " ];
+  "block_7" [ label = " block_7 \nfac = 1\ngoto block_8\n " ];
+  "block_8" [ label = " block_8 \nreturn fac\n " ];
+  "block_9" [ label = " block_9 \nt11 = num - 1\nparam t11\nt10 = call this.ComputeFac\nt12 = num * t10\nfac = t12\ngoto block_8\n " ];
+  "block_10" [ label = " block_10 \nt13 = i < num\nif t13 goto block_11\niffalse t13 goto block_12\n " ];
+  "block_11" [ label = " block_11 \nt14 = f1 + f0\nfib = t14\nf0 = f1\nf1 = fib\nt15 = i + 1\ni = t15\ngoto block_10\n " ];
+  "block_12" [ label = " block_12 \nreturn fib\n " ];
+  "B.main" -> "FacFib.Compute" [ style = dashed, color = blue, label = "call" ];
+  "FacFib.Compute" -> "block_4" [ xlabel = " true " ];
+  "FacFib.Compute" -> "block_6" [ xlabel = " false " ];
+  "FacFib.ComputeFac" -> "block_7" [ xlabel = " true " ];
+  "FacFib.ComputeFac" -> "block_9" [ xlabel = " false " ];
+  "FacFib.ComputeFib" -> "block_10";
+  "block_4" -> "block_5";
+  "block_4" -> "FacFib.ComputeFac" [ style = dashed, color = blue, label = "call" ];
+  "block_4" -> "FacFib.ComputeFib" [ style = dashed, color = blue, label = "call" ];
+  "block_6" -> "block_5";
+  "block_7" -> "block_8";
+  "block_9" -> "block_8";
+  "block_9" -> "FacFib.ComputeFac" [ style = dashed, color = blue, label = "call" ];
+  "block_10" -> "block_11" [ xlabel = " true " ];
+  "block_10" -> "block_12" [ xlabel = " false " ];
+  "block_11" -> "block_10";
   entry [shape=oval, label="entry"];
-  entry -> "E.main";
+  entry -> "B.main";
 }

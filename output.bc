@@ -1,72 +1,165 @@
-.class public E
+.class public B
 .super java/lang/Object
 
 .method public main()I
-    ; Method entry for E.main
+    ; Method entry for B.main
 L0:
-    iconst 4
-    iconst 2
-    imul
+    new FacFib
+    dup
+    invokespecial FacFib/<init>()V
     istore 1
-    iload 1
+    iconst 5
     iconst 10
-    iadd
+    invokevirtual t1.Compute
     istore 2
-    iconst 2
-    iconst 6
-    imul
-    istore 3
     iload 2
-    iload 3
-    isub
-    istore 4
-    iconst 4
+    print
+.end method
+
+.method public <init>()V
+    aload_0
+    invokespecial java/lang/Object/<init>()V
+    return
+.end method
+
+.class public FacFib
+.super java/lang/Object
+
+.method public Compute()I
+    ; Method entry for FacFib.Compute
+L1:
+    iload 1
     iconst 1
-    isub
+    ilt
+    istore 2
+    iload 2
+    inot
+    istore 3
+    iload 4
+    iconst 1
+    ilt
     istore 5
     iload 5
-    iconst 2
+    inot
+    istore 6
+    iload 3
+    iload 6
+    iand
+    istore 7
+    iload 7
+    iffalse goto TMP_0
+    goto L4
+TMP_0:
+    iload 7
+    iffalse goto L6
+L4:
+    iload 1
+    invokevirtual this.ComputeFac
+    istore 8
+    iload 8
+    istore 9
+    iload 9
+    print
+    iload 4
+    invokevirtual this.ComputeFib
+    istore 10
+    iload 10
+    istore 11
+    iload 11
+    print
+    iconst 1
+    istore 12
+    goto L5
+L5:
+    iload 12
+    ireturn
+L6:
+    iconst 0
+    istore 12
+    goto L5
+.end method
+
+.method public ComputeFac()I
+    ; Method entry for FacFib.ComputeFac
+L2:
+    iload 1
+    iconst 1
+    ilt
+    istore 2
+    iload 2
+    iffalse goto TMP_1
+    goto L7
+TMP_1:
+    iload 2
+    iffalse goto L9
+L7:
+    iconst 1
+    istore 3
+    goto L8
+L8:
+    iload 3
+    ireturn
+L9:
+    iload 1
+    iconst 1
+    isub
+    istore 4
+    iload 4
+    invokevirtual this.ComputeFac
+    istore 5
+    iload 1
+    iload 5
     imul
     istore 6
     iload 6
-    iconst 2
-    imul
+    istore 3
+    goto L8
+.end method
+
+.method public ComputeFib()I
+    ; Method entry for FacFib.ComputeFib
+L3:
+    iconst 0
+    istore 1
+    iconst 1
+    istore 2
+    iload 3
+    istore 4
+    iconst 1
+    istore 5
+    goto L10
+L10:
+    iload 5
+    iload 3
+    ilt
+    istore 6
+    iload 6
+    iffalse goto TMP_2
+    goto L11
+TMP_2:
+    iload 6
+    iffalse goto L12
+L11:
+    iload 2
+    iload 1
+    iadd
     istore 7
-    iload 4
     iload 7
+    istore 4
+    iload 2
+    istore 1
+    iload 4
+    istore 2
+    iload 5
+    iconst 1
     iadd
     istore 8
     iload 8
-    print
-    iconst 1
-    inot
-    istore 9
-    iload 9
-    iconst 0
-    iand
-    istore 10
-    iconst 1
-    iload 10
-    ieq
-    istore 11
-    iconst 10
-    iconst 1
-    igt
-    istore 12
-    iconst 1
-    iconst 10
-    ilt
-    istore 13
-    iload 12
-    iload 13
-    iand
-    istore 14
-    iload 11
-    iload 14
-    ior
-    istore 15
-    iload 15
-    print
+    istore 5
+    goto L10
+L12:
+    iload 4
+    ireturn
 .end method
 
 .method public <init>()V
@@ -77,7 +170,7 @@ L0:
 
 .method public static main([Ljava/lang/String;)V
     ; Default main method
-    invokestatic E/main()I
+    invokestatic B/main()I
     pop
     stop
 .end method
