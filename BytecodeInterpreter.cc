@@ -121,20 +121,15 @@ void BytecodeInterpreter::execute() {
     programCounter = 0;
     running = true;
     
-    // Find and start from main method if it exists
-    auto mainIt = methods.find("D1.main");
-    if (mainIt == methods.end()) {
-        mainIt = methods.find("D2.main");
+    // Find and start from any main method if it exists
+    auto mainIt = methods.end();
+    for (const auto& method : methods) {
+        if (method.first.find(".main") != std::string::npos) {
+            mainIt = methods.find(method.first);
+            break;
+        }
     }
-    if (mainIt == methods.end()) {
-        mainIt = methods.find("D3.main");
-    }
-    if (mainIt == methods.end()) {
-        mainIt = methods.find("C1.main");
-    }
-    if (mainIt == methods.end()) {
-        mainIt = methods.find("E.main");
-    }
+    
     if (mainIt != methods.end()) {
         programCounter = mainIt->second.startAddress;
         if (verbose) std::cout << "Starting execution from " << mainIt->first << " at address " << programCounter << std::endl;
