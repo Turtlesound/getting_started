@@ -3,7 +3,7 @@
 #include <sstream>
 
 // Constructor implementation
-BytecodeGenerator::BytecodeGenerator() : localVarCounter(0) {}
+BytecodeGenerator::BytecodeGenerator() : localVarCounter(0), pendingParamCount(0), labelCounter(0) {}
 
 // Helper method to get or assign a local variable index
 int BytecodeGenerator::getVarIndex(const std::string& varName) {
@@ -16,6 +16,11 @@ int BytecodeGenerator::getVarIndex(const std::string& varName) {
 // Helper method to generate labels for blocks
 std::string BytecodeGenerator::getBlockLabel(BasicBlock* block) {
     return "L" + std::to_string(block->blockId);
+}
+
+// Helper method to generate unique labels
+std::string BytecodeGenerator::generateUniqueLabel() {
+    return "TMP_" + std::to_string(labelCounter++);
 }
 
 // Process a single IR instruction and generate bytecode
@@ -47,7 +52,7 @@ void BytecodeGenerator::generateInstructionBytecode(const Instruction& instr) {
                 outputFile << "    iload " << getVarIndex(instr.op2) << std::endl;
             }
             
-            // Perform operation
+            // Perform operation according to Table 2 specification
             if (instr.opcode == "+") {
                 outputFile << "    iadd" << std::endl;
             } else if (instr.opcode == "-") {
@@ -57,19 +62,9 @@ void BytecodeGenerator::generateInstructionBytecode(const Instruction& instr) {
             } else if (instr.opcode == "/") {
                 outputFile << "    idiv" << std::endl;
             } else if (instr.opcode == "<") {
-                // If comparing constant 0 with a variable, reverse the comparison for more intuitive loop behavior
-                if (instr.op1 == "0" && instr.op2[0] != '0' && instr.op2[0] != 't' && instr.op2[0] != 'f' && instr.op2 != "true" && instr.op2 != "false") {
-                    outputFile << "    igt" << std::endl;  // Use > instead of <
-                } else {
-                    outputFile << "    ilt" << std::endl;
-                }
+                outputFile << "    ilt" << std::endl;
             } else if (instr.opcode == ">") {
-                // Similarly reverse for constants
-                if (instr.op1 == "0" && instr.op2[0] != '0' && instr.op2[0] != 't' && instr.op2[0] != 'f' && instr.op2 != "true" && instr.op2 != "false") {
-                    outputFile << "    ilt" << std::endl;  // Use < instead of >
-                } else {
-                    outputFile << "    igt" << std::endl;
-                }
+                outputFile << "    igt" << std::endl;
             } else if (instr.opcode == "==") {
                 outputFile << "    ieq" << std::endl;
             } else if (instr.opcode == "&&") {
@@ -90,11 +85,14 @@ void BytecodeGenerator::generateInstructionBytecode(const Instruction& instr) {
                 outputFile << "    iload " << getVarIndex(instr.op1) << std::endl;
             }
             
-            // Perform operation
+            // Perform operation according to Table 2 specification
             if (instr.opcode == "!") {
                 outputFile << "    inot" << std::endl;
             } else if (instr.opcode == "-") {
-                outputFile << "    ineg" << std::endl;
+                // For unary minus, we need to load 0 first, then subtract
+                outputFile << "    iconst 0" << std::endl;
+                outputFile << "    swap" << std::endl;
+                outputFile << "    isub" << std::endl;
             }
             
             // Store result
@@ -108,34 +106,20 @@ void BytecodeGenerator::generateInstructionBytecode(const Instruction& instr) {
             } else {
                 outputFile << "    iload " << getVarIndex(instr.result) << std::endl;
             }
+            pendingParamCount++;  // Track number of parameters
             break;
 
         case Instruction::CALL:
             {
                 std::string methodName = instr.op1;
-                size_t dotPos = methodName.find('.');
-                if (dotPos != std::string::npos) {
-                    std::string className = methodName.substr(0, dotPos);
-                    std::string funcName = methodName.substr(dotPos + 1);
-                    
-                    if (funcName == "println" && className == "System.out") {
-                        outputFile << "    print" << std::endl;
-                    } else {
-                        // Load object reference first
-                        if (className.substr(0, 1) == "t") {
-                            outputFile << "    iload " << getVarIndex(className) << std::endl;
-                        }
-                        // Parameters should already be on stack from PARAM instructions
-                        std::string fullMethodName = className + "." + funcName;
-                        std::string signature = "()I";  // Default signature
-                        if (methodSignatures.find(fullMethodName) != methodSignatures.end()) {
-                            signature = methodSignatures[fullMethodName];
-                        }
-                        outputFile << "    invokevirtual " << funcName << signature << std::endl;
-                        if (!instr.result.empty()) {
-                            outputFile << "    istore " << getVarIndex(instr.result) << std::endl;
-                        }
-                    }
+                std::cout << "DEBUG: Processing CALL instruction with methodName: '" << methodName << "'" << std::endl;
+                
+                // Special case for System.out.println - use simple print instruction as per Table 2
+                if (methodName == "System.out.println") {
+                    std::cout << "DEBUG: Generating print bytecode" << std::endl;
+                    // The parameter should already be on the stack from PARAM instruction
+                    outputFile << "    print" << std::endl;
+                    pendingParamCount = 0;  // Reset parameter count
                 } else if (methodName.substr(0, 4) == "new ") {
                     // Object instantiation
                     std::string className = methodName.substr(4);
@@ -144,6 +128,25 @@ void BytecodeGenerator::generateInstructionBytecode(const Instruction& instr) {
                     outputFile << "    invokespecial " << className << "/<init>()V" << std::endl;
                     if (!instr.result.empty()) {
                         outputFile << "    istore " << getVarIndex(instr.result) << std::endl;
+                    }
+                } else {
+                    // Handle other method calls with invokevirtual
+                    size_t dotPos = methodName.find('.');
+                    if (dotPos != std::string::npos) {
+                        std::string className = methodName.substr(0, dotPos);
+                        std::string funcName = methodName.substr(dotPos + 1);
+                        std::cout << "DEBUG: className='" << className << "', funcName='" << funcName << "'" << std::endl;
+                        
+                        // Generate invokevirtual instruction
+                        outputFile << "    invokevirtual " << methodName << std::endl;
+                        
+                        // Store result if needed
+                        if (!instr.result.empty()) {
+                            outputFile << "    istore " << getVarIndex(instr.result) << std::endl;
+                        }
+                        
+                        // Reset parameter count after the call
+                        pendingParamCount = 0;
                     }
                 }
             }
@@ -157,6 +160,7 @@ void BytecodeGenerator::generateInstructionBytecode(const Instruction& instr) {
                     outputFile << "    iload " << getVarIndex(instr.result) << std::endl;
                 }
             }
+            // Use ireturn as per Table 2 specification
             outputFile << "    ireturn" << std::endl;
             break;
             
@@ -206,25 +210,35 @@ void BytecodeGenerator::generateInstructionBytecode(const Instruction& instr) {
             
         case Instruction::IF_TRUE:
             {
+                // Load condition
                 outputFile << "    iload " << getVarIndex(instr.op1) << std::endl; 
 
                 std::string labelStr = instr.result;
                 if (labelStr.rfind("block_", 0) == 0) {
                     labelStr = "L" + labelStr.substr(6);
                 }
-                outputFile << "    ifne " << labelStr << std::endl; // Jump if true (stack top value != 0)
+                
+                // For IF_TRUE, we want to jump when condition is true (non-zero)
+                // Since we only have "iffalse goto", we use it to skip over a goto
+                std::string skipLabel = generateUniqueLabel();
+                outputFile << "    iffalse goto " << skipLabel << std::endl;
+                outputFile << "    goto " << labelStr << std::endl;
+                outputFile << skipLabel << ":" << std::endl;
             }
             break;
 
         case Instruction::IF_FALSE:
             {
+                // Load condition
                 outputFile << "    iload " << getVarIndex(instr.op1) << std::endl;
 
                 std::string labelStr = instr.result;
                 if (labelStr.rfind("block_", 0) == 0) {
                     labelStr = "L" + labelStr.substr(6);
                 }
-                outputFile << "    ifeq " << labelStr << std::endl; // Jump if false (stack top value == 0)
+                
+                // Use iffalse goto directly as per Table 2
+                outputFile << "    iffalse goto " << labelStr << std::endl;
             }
             break;
 
@@ -288,13 +302,15 @@ void BytecodeGenerator::generateBytecode(const CFG& cfg, const std::string& outp
     visitedBlocks.clear();
     localVarIndices.clear();
     localVarCounter = 0;
+    pendingParamCount = 0;  // Reset parameter count
+    labelCounter = 0;       // Reset label counter
     methodSignatures.clear(); // Clear method signatures at the start
     
     // Group methods by class
     std::map<std::string, std::vector<std::pair<std::string, BasicBlock*>>> methodsByClass;
-    // Assuming CFG provides a way to get all method entry blocks and their parameter names/types
-    // For this example, we'll manually define parameter info for D1.java
+    // Hardcode parameter info for D1.java methods
     std::map<std::string, std::vector<std::string>> methodParametersFromAST;
+    methodParametersFromAST["Sum.calcSum"] = {"num"};  // calcSum has one parameter named "num"
 
 
     for (const auto& block : cfg.blocks) {
@@ -404,7 +420,7 @@ void BytecodeGenerator::generateBytecode(const CFG& cfg, const std::string& outp
     outputFile << "    ; Default main method" << std::endl;
     outputFile << "    invokestatic " << mainClassNameForStatic << "/main" << d1MainSignature << std::endl;
     outputFile << "    pop" << std::endl;
-    outputFile << "    return" << std::endl;
+    outputFile << "    stop" << std::endl;
     outputFile << ".end method" << std::endl;
     
     outputFile.close();

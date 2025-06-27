@@ -601,7 +601,7 @@ std::string IRGenerator::processArrayLength(Node* node) {
 
 
 std::string IRGenerator::processMethodCall(Node* node) {
-    std::string result_temp_name = newTemp();
+    std::string result_temp_name = cfg.newTemp();
     
     if (node->children.size() < 2) {
         std::cerr << "[DEBUG IRGen] Invalid method call structure. Node type: " << node->type << std::endl;
@@ -822,7 +822,7 @@ void CFG::generateDotFile(const std::string& filename) const {
     }
     
     outFile << "digraph {" << std::endl;
-    outFile << "  graph [ splines = ortho ]" << std::endl;
+    outFile << "  graph [ splines = ortho ];" << std::endl;
     outFile << "  node [ shape = box ];" << std::endl;
     
     // Generate nodes for basic blocks
@@ -874,10 +874,11 @@ void CFG::generateDotFile(const std::string& filename) const {
         }
     }
     
-    outFile << "  entry [shape=oval, label=\"entry\"];" << std::endl;
-if (entry) {
-    outFile << "  entry -> \"" << entry->label << "\";" << std::endl;
-}
+    // Add entry node
+    if (entry && !entry->instructions.empty()) {
+        outFile << "  entry [shape=oval, label=\"entry\"];" << std::endl;
+        outFile << "  entry -> \"" << entry->label << "\";" << std::endl;
+    }
     
     outFile << "}" << std::endl;
     outFile.close();

@@ -21,6 +21,8 @@ private:
     std::map<std::string, int> methodLabels;
     std::map<std::string, std::string> methodSignatures;  // Maps method names to their signatures
     int localVarCounter;
+    int pendingParamCount;  // Track parameters for method calls
+    int labelCounter;       // For generating unique labels
     std::ofstream outputFile;
     
     // Helper method to get or assign a local variable index
@@ -28,6 +30,9 @@ private:
     
     // Helper method to generate labels for blocks
     std::string getBlockLabel(BasicBlock* block);
+    
+    // Helper method to generate unique labels
+    std::string generateUniqueLabel();
     
     // Process a single IR instruction and generate bytecode
     void generateInstructionBytecode(const Instruction& instr);

@@ -1,6 +1,3 @@
 digraph SymbolTable {
   node [shape=record];
-  Sum [label="{Class: Sum|{Fields|none}|{Methods|calcSum: int}}"];
-  Sum_calcSum [label="{Method: calcSum|Return Type: int|{Parameters|num: int}|{Locals|sum: int}}"];
-  Sum -> Sum_calcSum;
 }
